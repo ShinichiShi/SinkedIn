@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { MessageCircle, X } from "lucide-react";
 
@@ -9,11 +10,15 @@ interface ChatMessage {
 }
 
 const Chatbot = () => {
+  const pathname = usePathname();
   const [isChatOpen, setIsChatOpen] = useState<boolean>(false);
   const [message, setMessage] = useState<string>("");
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [prompt, setPrompt] = useState<string>("You are Sadbot, a chatbot that empathizes with sadness and provides comforting advice. BUT DONT BE TOO CArried away while doing so...answer to the point while maintaining the empathy");
 
+  if (pathname!="/"){
+    return null;
+  }
   const toggleChat = () => {
     setIsChatOpen(!isChatOpen);
   };

@@ -5,6 +5,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Home, MessageSquare, Bell, User, Briefcase } from "lucide-react";
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { firebaseApp } from "@/lib/firebase";
 import { motion } from "framer-motion";
@@ -12,6 +13,7 @@ import { motion } from "framer-motion";
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+  const pathname = usePathname();
 
   useEffect(() => {
     const auth = getAuth(firebaseApp); // Initialize Firebase Auth
@@ -22,12 +24,16 @@ export function Navbar() {
     return () => unsubscribe(); // Clean up the listener on component unmount
   }, []);
 
+  // Hide the navbar on the landing page
+  if (pathname === "/") {
+    return null;
+  }
+
   return (
-    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 relative z-50">
+    <nav className="border-b bg-transparent relative z-50">
       <div className="container flex h-14 justify-between mx-[10%] items-center md:mx-auto">
         <div className="flex md:mr-4">
           <Link href="/" className="flex items-center space-x-2 md:mr-4">
-            <Briefcase className="h-6 w-6" />
             <span className="font-bold">SinkedIn</span>
           </Link>
         </div>
