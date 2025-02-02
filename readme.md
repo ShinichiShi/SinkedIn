@@ -22,12 +22,8 @@ The world is full of success stories, but what about the lessons learned from fa
 
 ---
 
-## Contributors
-
-- [**Ayush Singh**](https://github.com/ayush1009208)
-- [**Vaibhav Garg**](https://github.com/vaibhavgarg25)
-- [**Supreeth C**](https://github.com/ShinichiShi)
-- [**Rudraksha Singh**](https://github.com/rudrakshass)
+## Contribute
+Check out the [Contributing.md](Contributing.md) to contribute and setup this project locally.
 
 ---
 
@@ -40,11 +36,12 @@ The world is full of success stories, but what about the lessons learned from fa
 
 ---
 
+
 ## How to Run Locally
 
 ### Clone the repository:
 ```bash
-git clone https://github.com/your-username/sinkedin.git
+git clone https://github.com/vaibhavgarg25/SinkedIn.git
 cd sinkedin
 
 npm install
