@@ -1,91 +1,21 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import {
   collection,
   addDoc,
   serverTimestamp,
   getDocs,
-  query,
-  orderBy,
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
-import { Avatar } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Link2, ThumbsDown, MessageCircle } from "lucide-react";
-import { HashLoader } from "react-spinners";
 import { toast } from "react-toastify";
-import { motion } from "framer-motion";
-import { getAuth } from "firebase/auth";
-import { firebaseApp } from "@/lib/firebase";
-import { updateDoc, doc, increment } from "firebase/firestore";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
-type User = {
-  id: string;
-  username: string;
-  email: string;
-  profilepic?: string;
-};
 
 export function CreatePost() {
-  const [postContent, setPostContent] = useState<string>("");
+  const [postContent, setPostContent] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [posts, setPosts] = useState<any[]>([]);
-  const [users, setUsers] = useState<Record<string, User>>({});
+  const [currentUserProfilePic, setCurrentUserProfilePic] = useState("");
   const router = useRouter();
-  const [dislikedPosts, setDislikedPosts] = useState<string[]>([]);
-  const dislikes = useRef(0);
-  const [commentBoxStates, setCommentBoxStates] = useState<{
-    [key: string]: boolean;
-  }>({});
-  const [currentUserProfilePic, setCurrentUserProfilePic] = useState<
-    string | null
-  >(null);
-  const [commentInputs, setCommentInputs] = useState<{ [key: string]: string }>(
-    {}
-  );
 
-  const fetchPosts = async () => {
-    try {
-      const postsRef = collection(db, "posts");
-      const postsQuery = query(postsRef, orderBy("timestamp", "desc"));
-      const postsSnapshot = await getDocs(postsQuery);
-      const postsList = postsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        dislikes: doc.data().dislikes || 0,
-        dislikedBy: doc.data().dislikedBy || [], // Fetch dislikedBy array
-        ...doc.data(),
-      }));
-      setPosts(postsList);
-
-      // Update local dislikedPosts state for the current user
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        const dislikedPostIds = postsList
-          .filter((post) => post.dislikedBy.includes(currentUser.uid))
-          .map((post) => post.id);
-        setDislikedPosts(dislikedPostIds);
-      }
-    } catch (error) {
-      console.error("Error fetching posts:", error);
-      setErrorMessage("An error occurred while fetching posts.");
-    }
-  };
-
-  const fetchUsers = async () => {
-    try {
-      const usersSnapshot = await getDocs(collection(db, "users"));
-      const usersMap: Record<string, User> = {};
-      usersSnapshot.forEach((doc) => {
-        usersMap[doc.id] = { id: doc.id, ...doc.data() } as User;
-      });
-      setUsers(usersMap);
-    } catch (error) {
-      console.error("Error fetching users:", error);
-    }
-  };
   const fetchCurrentUserProfile = useCallback(async () => {
     const currentUser = auth.currentUser;
     if (!currentUser) {
@@ -99,13 +29,10 @@ export function CreatePost() {
         .find((doc) => doc.id === currentUser.uid)
         ?.data();
 
-      if (userData && userData.profilepic) {
-        setCurrentUserProfilePic(userData.profilepic);
-      } else {
-        setCurrentUserProfilePic(
-          "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"
-        );
-      }
+      setCurrentUserProfilePic(
+        userData?.profilepic || 
+        "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"
+      );
     } catch (error) {
       console.error("Error fetching user profile:", error);
       setCurrentUserProfilePic(
@@ -113,449 +40,146 @@ export function CreatePost() {
       );
     }
   }, [router]);
+
   useEffect(() => {
-    setLoading(true);
-    Promise.all([
-      fetchPosts(),
-      fetchCurrentUserProfile(),
-      fetchUsers(),
-    ]).finally(() => setLoading(false));
+    fetchCurrentUserProfile();
   }, [fetchCurrentUserProfile]);
-  const handlePostComment = async (postId: string) => {
-    const currentUser = auth.currentUser;
-    if (!currentUser) {
-      console.error("User not logged in.");
-      return;
-    }
-
-    const commentText = commentInputs[postId];
-    if (!commentText.trim()) {
-      toast.error("Comment cannot be empty.");
-      return;
-    }
-
-    try {
-      const postRef = doc(db, "posts", postId);
-
-      // Get the current comments from the document
-      const postSnapshot = await getDocs(
-        query(collection(db, "posts"), orderBy("timestamp", "desc"))
-      );
-      const postDoc = postSnapshot.docs.find((doc) => doc.id === postId);
-
-      const postComments = postDoc?.data()?.comments || [];
-
-      // Manually create the timestamp (client-side)
-      const newComment = {
-        userId: currentUser.uid,
-        text: commentText,
-        timestamp: Date.now(),
-      };
-
-      await updateDoc(postRef, {
-        comments: [...postComments, newComment],
-      });
-
-      setCommentInputs((prev: any) => ({
-        ...prev,
-        [postId]: "",
-      }));
-
-      toast.success("Comment posted successfully.");
-    } catch (error) {
-      console.error("Posting Comment Error:", error);
-      toast.error("Failed to post comment.");
-    }
-  };
 
   const handlePostSubmit = async () => {
+    if (!postContent.trim()) {
+      setErrorMessage("Post content is empty.");
+      return;
+    }
+
     setLoading(true);
-    if (postContent.trim()) {
-      try {
-        const currentUser = auth.currentUser;
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        toast.error("Please log in to post");
+        router.push("/login");
+        return;
+      }
 
-        if (!currentUser) {
-          console.error("No user is logged in.");
-          setLoading(false);
-          return;
-        }
+      const response = await fetch("/api/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: postContent }),
+      });
 
-        const response = await fetch("/api/validate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text: postContent }),
+      if (!response.ok) {
+        throw new Error("Failed to analyze sentiment");
+      }
+
+      const data = await response.json();
+
+      if (data.result === "1") {
+        const postsRef = collection(db, "posts");
+        await addDoc(postsRef, {
+          content: postContent,
+          timestamp: serverTimestamp(),
+          userName: currentUser.displayName || "Anonymous",
+          userId: currentUser.uid,
+          createdAt: new Date().toISOString(),
+          dislikes: 0,
+          dislikedBy: [],
+          shares: 0,
+          comments: [],
         });
 
-        if (!response.ok) {
-          throw new Error("Failed to analyze sentiment");
-        }
-
-        const data = await response.json();
-
-        if (data.result === "1") {
-          const currentUserId = currentUser.uid;
-          const postsRef = collection(db, "posts");
-
-          await addDoc(postsRef, {
-            content: postContent,
-            timestamp: serverTimestamp(),
-            userName: currentUser.displayName || "Anonymous",
-            userId: currentUserId,
-            dislikes: 0,
-            dislikedBy: [],
-            shares: 0, // Initialize share count
-          });
-
-          await fetchPosts();
-          toast.success("Your voice shall be heard");
-          setPostContent("");
-        } else {
-          toast.error("ooo nice...how informative");
-        }
-      } catch (error) {
-        console.error("Error processing post:", error);
-        setErrorMessage("An error occurred while posting.");
-      } finally {
-        setLoading(false);
+        toast.success("Your voice shall be heard");
+        setPostContent("");
+        window.location.reload(); // Refresh to show new post
+      } else {
+        toast.error("ooo nice...how informative");
       }
-    } else {
-      setErrorMessage("Post content is empty.");
+    } catch (error) {
+      console.error("Error processing post:", error);
+      setErrorMessage("An error occurred while posting.");
+    } finally {
       setLoading(false);
     }
   };
 
-  const handleDislike = async (postId: string) => {
-    try {
-      const currentUser = auth.currentUser;
-
-      if (!currentUser) {
-        toast.error("You need to be logged in to dislike a post.");
-        return;
-      }
-
-      const postRef = doc(db, "posts", postId);
-      const postIndex = posts.findIndex((post) => post.id === postId);
-      const post = posts[postIndex];
-
-      // Check if the user has already disliked the post
-      const userId = currentUser.uid;
-      const hasDisliked = post.dislikedBy?.includes(userId);
-
-      if (hasDisliked) {
-        // Remove dislike
-        const updatedDislikedBy = post.dislikedBy.filter(
-          (id: string) => id !== userId
-        );
-
-        await updateDoc(postRef, {
-          dislikes: Math.max((post.dislikes || 0) - 1, 0),
-          dislikedBy: updatedDislikedBy,
-        });
-
-        setPosts((prevPosts) =>
-          prevPosts.map((p, idx) =>
-            idx === postIndex
-              ? {
-                  ...p,
-                  dislikes: Math.max((post.dislikes || 0) - 1, 0),
-                  dislikedBy: updatedDislikedBy,
-                }
-              : p
-          )
-        );
-
-        setDislikedPosts(dislikedPosts.filter((id) => id !== postId));
-      } else {
-        // Add dislike
-        const updatedDislikedBy = [...(post.dislikedBy || []), userId];
-
-        await updateDoc(postRef, {
-          dislikes: (post.dislikes || 0) + 1,
-          dislikedBy: updatedDislikedBy,
-        });
-
-        setPosts((prevPosts) =>
-          prevPosts.map((p, idx) =>
-            idx === postIndex
-              ? {
-                  ...p,
-                  dislikes: (post.dislikes || 0) + 1,
-                  dislikedBy: updatedDislikedBy,
-                }
-              : p
-          )
-        );
-
-        setDislikedPosts([...dislikedPosts, postId]);
-      }
-    } catch (error) {
-      console.error("Error updating dislikes:", error);
-      toast.error("Failed to update dislikes.");
-    }
-  };
-
-  const handleShare = async (postId: string) => {
-    try {
-      const postRef = doc(db, "posts", postId);
-      const postIndex = posts.findIndex((post) => post.id === postId);
-
-      if (postIndex !== -1) {
-        // Increment the share count in Firestore
-        await updateDoc(postRef, {
-          shares: increment(1),
-        });
-
-        // Update local state
-        setPosts((prevPosts) =>
-          prevPosts.map((p, idx) =>
-            idx === postIndex ? { ...p, shares: (p.shares || 0) + 1 } : p
-          )
-        );
-
-        // Optional: Copy link to clipboard or trigger Web Share API
-        const shareUrl = `${window.location.origin}/post/${postId}`;
-        if (navigator.share) {
-          await navigator.share({
-            title: "Check out this post!",
-            url: shareUrl,
-          });
-        } else {
-          await navigator.clipboard.writeText(shareUrl);
-          toast.success("Post link copied to clipboard!");
-        }
-      }
-    } catch (error) {
-      console.error("Error sharing post:", error);
-      toast.error("Failed to share post.");
-    }
-  };
-
-  const handlePostClick = async (postId: string) => {
-    window.location.href = `${window.location.origin}/post/${postId}`;
-  }
-
-  const toggleCommentBox = (postId: string) => {
-    setCommentBoxStates((prev: any) => ({
-      ...prev,
-      [postId]: !prev[postId],
-    }));
-  };
-
   return (
-    <div className="relative">
-      {loading && (
-        <div className="absolute inset-0 top-0 h-[20%] flex items-center justify-center z-50">
-          <HashLoader size={50} color="#ffffff" />
+    <div className="bg-card rounded-lg p-4 shadow-md">
+      <div className="flex gap-4">
+        <div className="w-10 h-10 rounded-full overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={currentUserProfilePic}
+            alt="User's avatar"
+            className="w-full h-full object-cover"
+          />
         </div>
-      )}
-
-      <Card className="p-4 ">
-        <div className="flex gap-4">
-          <Avatar className="w-10 h-10">
-            <Image
-              loading="lazy"
-              src={currentUserProfilePic || ""}
-              width={100}
-              height={100}
-              alt={"User's avatar"}
-              className="rounded-full"
-            />
-          </Avatar>
-          <div className="flex-1 w-[50%]">
-            <Textarea
-              placeholder="Share your latest failure..."
-              className="min-h-[100px]"
-              value={postContent}
-              onChange={(e: any) => setPostContent(e.target.value)}
-            />
-            <div className="justify-between items-center mt-4 md:flex">
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm">
-                  Add Proof
-                </Button>
-                <Button variant="outline" size="sm">
-                  <Link2 className="h-4 w-4 mr-2" />
-                  Rejection Letter
-                </Button>
-              </div>
-              <Button
-                size="sm"
-                onClick={handlePostSubmit}
-                disabled={loading}
-                className="my-2"
+        <div className="flex-1">
+          <textarea
+            placeholder="Share your latest failure..."
+            value={postContent}
+            onChange={(e) => setPostContent(e.target.value)}
+            className="w-full min-h-[100px] p-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/50 bg-background"
+          />
+          <div className="justify-between items-center mt-4 md:flex">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                className="px-3 py-1 text-sm border rounded-md hover:bg-gray-100"
               >
-                Confess
-              </Button>
+                Add Proof
+              </button>
+              <button
+                type="button"
+                className="px-3 py-1 text-sm border rounded-md hover:bg-gray-100 flex items-center"
+              >
+                <span className="w-4 h-4 mr-2">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                  </svg>
+                </span>
+                Rejection Letter
+              </button>
             </div>
+            <button
+              onClick={handlePostSubmit}
+              disabled={loading}
+              className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50 my-2"
+            >
+              {loading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  <span>Posting...</span>
+                </span>
+              ) : (
+                "Confess"
+              )}
+            </button>
           </div>
         </div>
-        {errorMessage && <p className="text-red-500 text-sm">{errorMessage}</p>}
-      </Card>
-
-      <div className="mt-6">
-        {posts.length > 0 ? (
-          posts.map((post: any) => {
-            const user = users[post.userId];
-            const profilePic =
-              user?.profilepic ||
-              "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png";
-            return (
-              <Card 
-                key={post.id} 
-                className="p-4 mb-4"
-                onClick={() => handlePostClick(post.id)}
-                >
-                <div className="flex gap-4">
-                  <Avatar className="w-10 h-10">
-                    <Image
-                      src={profilePic}
-                      height={100}
-                      width={100}
-                      alt={`${user?.username || "Anonymous"}'s avatar`}
-                      className="rounded-full"
-                    />
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="font-bold">{post.userName}</p>
-                    <p className="text-sm text-gray-600">
-                      {new Date(
-                        post.timestamp?.seconds * 1000
-                      ).toLocaleString()}
-                    </p>
-                    <p className="mt-2">{post.content}</p>
-                  </div>
-                </div>
-                <hr className="my-4 border-secondary" /> {/* Divider line */}
-                <div className="flex justify-around text-sm text-gray-500">
-                  <motion.div whileTap={{ scale: 0.9 }}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        handleDislike(post.id);
-                      }}
-                      className="flex items-center gap-2"
-                    >
-                      <ThumbsDown
-                        className={`h-4 w-4 ${
-                          dislikedPosts.includes(post.id)
-                            ? "text-red-500"
-                            : "text-muted-foreground"
-                        }`}
-                      />
-                      {post.dislikes} Dislike
-                    </Button>
-                  </motion.div>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      toggleCommentBox(post.id)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <MessageCircle className="h-4 w-4" />
-                    Comment
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      handleShare(post.id)
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <Link2 className="h-4 w-4" />
-                    {post.shares || 0} Shares
-                  </Button>
-                </div>
-                <hr className="my-4 border-secondary" />
-                {commentBoxStates[post.id] && (
-                  <>
-                    <div className="mt-4">
-                      <div className="flex items-center gap-2">
-                        <Avatar className="w-8 h-8">
-                          <Image
-                            src={currentUserProfilePic || ""}
-                            height={100}
-                            width={100}
-                            alt="User Avatar"
-                            className="rounded-full"
-                          />
-                        </Avatar>
-                        <Textarea
-                          placeholder="Write a comment..."
-                          className="flex-1 min-h-[40px] resize-none text-sm"
-                          value={commentInputs[post.id] || ""}
-                          onChange={(e: any) =>
-                            setCommentInputs((prev: any) => ({
-                              ...prev,
-                              [post.id]: e.target.value,
-                            }))
-                          }
-                          onClick={(event) => {
-                            event.stopPropagation();
-                          }}
-                        />
-                        <Button
-                          size="sm"
-                          className="ml-2"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handlePostComment(post.id)
-                          }}
-                        >
-                          Post
-                        </Button>
-                      </div>
-                    </div>
-                    {post.comments && post.comments.length > 0 && (
-                      <div className="mt-4">
-                        {post.comments.map((comment: any, index: any) => (
-                          <div
-                            key={index}
-                            className="flex items-center gap-2 mt-2 p-2 rounded-md bg-background"
-                          >
-                            <Avatar className="w-8 h-8">
-                              <Image
-                                src={
-                                  users[comment.userId]?.profilepic ||
-                                  "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"
-                                }
-                                width={100}
-                                height={100}
-                                alt="Commenter's Avatar"
-                                className="rounded-full"
-                              />
-                            </Avatar>
-                            <div>
-                              <p className="font-bold text-sm">
-                                {users[comment.userId]?.username || "Anonymous"}
-                              </p>
-                              <p>{comment.text}</p>
-                              <p className="text-gray-500 text-xs">
-                                {new Date(comment.timestamp).toLocaleString()}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
-              </Card>
-            );
-          })
-        ) : (
-          <div className="flex h-screen justify-center items-center">
-            <HashLoader color="white" />
-          </div>
-        )}
       </div>
+      {errorMessage && <p className="text-red-500 text-sm mt-2">{errorMessage}</p>}
     </div>
   );
 }
