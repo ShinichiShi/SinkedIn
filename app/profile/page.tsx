@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pencil, MapPin, LogOut, ThumbsDown, MessageCircle, Link2 } from "lucide-react";
+import { ThumbsDown, MessageCircle, Link2, Pencil, LogOut } from "lucide-react";
 import { doc, getDoc, collection, query, getDocs, updateDoc } from "firebase/firestore";
+import Image from "next/image";
 import { getAuth, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { firebaseApp, db } from "@/lib/firebase";
@@ -279,336 +279,428 @@ export default function Profile() {
   const avatarSrc = userData?.profilepic || 
     "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png";
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin text-primary">Loading...</div>
-      </div>
-    );
-  }
-
   const getTabClassName = (tab: 'posts' | 'followers' | 'following') => {
-    return activeTab === tab
-      ? 'px-4 py-2 text-sm font-medium border-b-2 border-primary text-primary'
-      : 'px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground';
+    return `${
+      activeTab === tab
+        ? 'border-b-2 border-white text-white'
+        : 'text-gray-400 hover:text-white border-b-2 border-transparent hover:border-gray-600'
+    } px-3 sm:px-6 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-all cursor-pointer`;
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background/80 to-background">
-      {/* Hero Section */}
-      <div className="relative w-full h-[300px]">
-        <div 
-          className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 backdrop-blur-sm"
-          style={{
-            backgroundImage: userData?.backgroundImage ? `url(${userData.backgroundImage})` : undefined,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center',
-          }}
-        >
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 ">
+      {loading ? (
+        <div className="flex items-center justify-center h-screen">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin -mt-6" />
         </div>
-        
-        <div className="absolute -bottom-16 left-8 flex items-end gap-6">
-          <div className="relative group">
-            <div className="h-32 w-32 rounded-full border-4 border-background bg-primary/10 shadow-xl overflow-hidden transition-transform duration-300 group-hover:scale-105">
-              {userData?.profilepic ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img 
-                  src={userData.profilepic} 
-                  alt={userData.username || "Profile"}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-4xl font-bold">
-                  {userData?.username?.[0]?.toUpperCase()}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="mb-4 flex flex-col gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">
-              {userData?.username}
-            </h1>
-            <p className="text-muted-foreground max-w-md">
-              {userData?.bio || "No bio yet"}
-            </p>
-            <div className="flex items-center gap-4">
-              {userData?.location && (
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <span className="inline-block w-4 h-4">📍</span>
-                  <span>{userData.location}</span>
-                </div>
-              )}
-              <div className="flex items-center gap-4">
-                <div className="px-3 py-1 rounded-full bg-secondary/10 border border-border/50 backdrop-blur-sm">
-                  <span className="text-sm font-medium">{userData?.followers?.length || 0} Followers</span>
-                </div>
-                <div className="px-3 py-1 rounded-full bg-secondary/10 border border-border/50 backdrop-blur-sm">
-                  <span className="text-sm font-medium">{userData?.following?.length || 0} Following</span>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="mb-4 ml-auto mr-8 flex gap-2">
-            <Button
-              onClick={handleOpenModal}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <Pencil className="h-4 w-4" />
-              Edit
-            </Button>
-            <CloudinaryUploadWidget
-              onUploadSuccess={(url) => handleImageUpload(url, 'profile')}
-              variant="profile"
-            />
-            <CloudinaryUploadWidget
-              onUploadSuccess={(url) => handleImageUpload(url, 'background')}
-              variant="background"
-            />
-            <Button
-              onClick={handleLogout}
-              variant="destructive"
-              size="sm"
-              className="gap-2"
-            >
-              <LogOut className="h-4 w-4" />
-              Logout
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      <div className="container mx-auto mt-24 px-4">
-        <div className="flex gap-2 mb-6 border-b">
-          <button
-            onClick={() => setActiveTab('posts')}
-            className={getTabClassName('posts')}
-          >
-            Posts
-          </button>
-          <button
-            onClick={() => setActiveTab('followers')}
-            className={getTabClassName('followers')}
-          >
-            Followers
-          </button>
-          <button
-            onClick={() => setActiveTab('following')}
-            className={getTabClassName('following')}
-          >
-            Following
-          </button>
-        </div>
-
-        <div className="mt-6">
-          {activeTab === 'posts' && (
-            <div className="grid gap-6">
-              {posts.map((post) => (
-                <div
-                  key={post.id}
-                  onClick={() => router.push(`/post/${post.id}`)}
-                  className="p-6 rounded-lg border border-border/40 bg-card/30 backdrop-blur-sm transition-all duration-300 hover:border-border hover:bg-card/50 group cursor-pointer"
-                >
-                  <div className="flex items-center space-x-4 mb-4">
-                    <div className="w-12 h-12 rounded-full overflow-hidden relative ring-2 ring-primary/20 ring-offset-2 ring-offset-background">
-                      {userData?.profilepic ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={userData.profilepic}
-                          alt={userData.username || "Profile"}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-xl font-bold bg-primary/10">
-                          {userData?.username?.[0]?.toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
-                        {userData?.username || "Anonymous"}
-                      </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {post.timestamp ? new Date(post.timestamp.toDate()).toLocaleString() : ""}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="text-base text-foreground/90 leading-relaxed whitespace-pre-wrap px-4 py-2 rounded-lg bg-accent/5">
-                    {post.content}
-                  </div>
-
-                  <div className="flex justify-around pt-4 mt-4 border-t border-border/30">
-                    <div className="flex items-center space-x-2 text-muted-foreground">
-                      <ThumbsDown className="h-5 w-5" />
-                      <span>{post.dislikes || 0}</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-muted-foreground">
-                      <MessageCircle className="h-5 w-5" />
-                      <span>{post.comments?.length || 0}</span>
-                    </div>
-                    <div className="flex items-center space-x-2 text-muted-foreground">
-                      <Link2 className="h-5 w-5" />
-                      <span>{post.shares || 0}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {posts.length === 0 && (
-                <div className="text-center text-muted-foreground">
-                  No posts yet. Share your first failure story!
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'followers' && (
-            <div className="grid gap-4">
-              {userData?.followers.map((followerId) => (
-                <UserListItem key={followerId} userId={followerId} />
-              ))}
-              {!userData?.followers.length && (
-                <div className="text-center text-muted-foreground">
-                  No followers yet. Keep sharing your failures!
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'following' && (
-            <div className="grid gap-4">
-              {userData?.following.map((followingId) => (
-                <UserListItem key={followingId} userId={followingId} />
-              ))}
-              {!userData?.following.length && (
-                <div className="text-center text-muted-foreground">
-                  You&apos;re not following anyone yet. Find some fellow failures!
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {isModalOpen && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50">
-          <div className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-lg">
-            <div className="bg-card border rounded-lg shadow-lg p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold">Edit Profile</h2>
-                <button
-                  onClick={handleCloseModal}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Background Image</label>
-                  {edit.backgroundImage ? (
-                    <div className="relative h-32 w-full rounded-lg border-2 border-dashed border-border/50 overflow-hidden group">
-                      <Image
-                        src={edit.backgroundImage}
-                        alt="Background"
-                        fill
-                        className="object-cover group-hover:opacity-75 transition-opacity"
-                      />
-                    </div>
-                  ) : null}
-                  <div className="mt-2">
-                    <CloudinaryUploadWidget 
-                      onUploadSuccess={handleBackgroundImageUpload}
-                      variant="background"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-2">Profile Picture</label>
-                  {edit.profilepic ? (
-                    <div className="relative h-32 w-32 rounded-full border-2 border-dashed border-border/50 overflow-hidden group mb-2">
-                      <Image
-                        src={edit.profilepic}
-                        alt="Profile"
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                  ) : null}
-                  <div className="mt-2">
-                    <CloudinaryUploadWidget
-                      onUploadSuccess={handleProfileImageUpload}
-                      variant="profile"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Username</label>
-                  <input
-                    type="text"
-                    id="username"
-                    value={edit.username}
-                    onChange={handleEditChange}
-                    className="w-full px-3 py-2 rounded-md border bg-background"
-                  />
-                </div>
+      ) : (
+        <>
+          {/* Hero Section */}
+          <div className="relative w-full h-64 sm:h-80 overflow-hidden">
+            {/* Background Image or Gradient */}
+            <div 
+              className="absolute inset-0"
+              style={{
+                backgroundImage: userData?.backgroundImage 
+                  ? `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url(${userData.backgroundImage})`
+                  : 'linear-gradient(135deg, #1e3a8a 0%, #3730a3 50%, #581c87 100%)',
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
                 
-                <div>
-                  <label className="block text-sm font-medium mb-1">Bio</label>
-                  <textarea
-                    id="bio"
-                    value={edit.bio}
-                    onChange={handleEditChange}
-                    rows={3}
-                    className="w-full px-3 py-2 rounded-md border bg-background resize-none"
-                  />
+              }}
+            />
+            
+            {/* Profile Content */}
+            <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-8">
+              {/* Mobile Layout */}
+              <div className="block sm:hidden">
+                {/* Profile Picture - Centered on mobile */}
+                <div className="flex justify-center mb-4">
+                  <div className="w-24 h-24 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-gray-200">
+                    {userData?.profilepic ? (
+                      <img 
+                        src={userData.profilepic} 
+                        alt={userData.username || "Profile"}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-gray-600 bg-gray-100">
+                        {userData?.username?.[0]?.toUpperCase() || '?'}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium mb-1">Location</label>
-                  <input
-                    type="text"
-                    id="location"
-                    value={edit.location}
-                    onChange={handleEditChange}
-                    className="w-full px-3 py-2 rounded-md border bg-background"
-                  />
-                </div>
-              </div>
 
-              <div className="flex justify-end gap-2 mt-6">
-                <button
-                  onClick={handleCloseModal}
-                  className="px-4 py-2 text-sm font-medium rounded-md hover:bg-secondary/80 border border-border/50 transition-all hover:border-border"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  disabled={isUploading}
-                  className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
-                >
-                  {isUploading ? (
-                    <span className="flex items-center gap-2">
-                      <div className="w-4 h-4 border-2 border-white/30 border-t-white/90 rounded-full animate-spin" />
-                      Saving...
-                    </span>
-                  ) : (
-                    "Save Changes"
+                {/* Profile Info - Centered on mobile */}
+                <div className="text-center">
+                  <h1 className="text-2xl font-bold text-white mb-2">
+                    {userData?.username || 'Unknown User'}
+                  </h1>
+                  {userData?.bio && (
+                    <p className="text-gray-200 text-sm mb-3 px-2">
+                      {userData.bio}
+                    </p>
                   )}
-                </button>
+                  <div className="flex flex-col gap-2 items-center">
+                    {userData?.location && (
+                      <div className="flex items-center gap-1 text-gray-300 text-sm">
+                        <span>📍</span>
+                        <span>{userData.location}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-4 text-xs text-gray-300">
+                      <span className="font-medium">{userData?.followers?.length || 0} Followers</span>
+                      <span className="font-medium">{userData?.following?.length || 0} Following</span>
+                    </div>
+                  </div>
+
+                  {/* Action Buttons - Mobile */}
+                  <div className="flex gap-2 justify-center mt-4">
+                    <Button
+                      onClick={handleOpenModal}
+                      variant="outline"
+                      size="sm"
+                      className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm text-xs"
+                    >
+                      <Pencil className="h-3 w-3 mr-1" />
+                      Edit
+                    </Button>
+                    <Button
+                      onClick={handleLogout}
+                      variant="destructive"
+                      size="sm"
+                      className="bg-red-600/80 hover:bg-red-700 border-none text-xs"
+                    >
+                      <LogOut className="h-3 w-3 mr-1" />
+                      Logout
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Desktop Layout */}
+              <div className="hidden sm:flex items-end gap-6">
+                {/* Profile Picture */}
+                <div className="relative">
+                  <div className="w-32 h-32 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-gray-200">
+                    {userData?.profilepic ? (
+                      <img 
+                        src={userData.profilepic} 
+                        alt={userData.username || "Profile"}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-gray-600 bg-gray-100">
+                        {userData?.username?.[0]?.toUpperCase() || '?'}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Profile Info */}
+                <div className="flex-1 pb-4">
+                  <div className="flex items-end justify-between">
+                    <div>
+                      <h1 className="text-4xl font-bold text-white mb-2">
+                        {userData?.username || 'Unknown User'}
+                      </h1>
+                      {userData?.bio && (
+                        <p className="text-gray-200 text-lg mb-3 max-w-md">
+                          {userData.bio}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-6">
+                        {userData?.location && (
+                          <div className="flex items-center gap-1 text-gray-300">
+                            <span>📍</span>
+                            <span>{userData.location}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-4 text-sm text-gray-300">
+                          <span className="font-medium">{userData?.followers?.length || 0} Followers</span>
+                          <span className="font-medium">{userData?.following?.length || 0} Following</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={handleOpenModal}
+                        variant="outline"
+                        className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
+                      >
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit
+                      </Button>
+                      <Button
+                        onClick={handleLogout}
+                        variant="destructive"
+                        className="bg-red-600/80 hover:bg-red-700 border-none"
+                      >
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Logout
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+
+          {/* Tabs and Content */}
+          <div className="bg-slate-900">
+            {/* Tabs */}
+            <div className="border-b border-gray-700">
+              <div className="container max-w-6xl mx-auto px-4 sm:px-8">
+                <div className="flex overflow-x-auto">
+                  <button
+                    onClick={() => setActiveTab('posts')}
+                    className={getTabClassName('posts')}
+                  >
+                    Posts
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('followers')}
+                    className={getTabClassName('followers')}
+                  >
+                    <span className="hidden sm:inline">Followers </span>
+                    <span className="sm:hidden">Followers </span>
+                    ({userData?.followers?.length || 0})
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('following')}
+                    className={getTabClassName('following')}
+                  >
+                    <span className="hidden sm:inline">Following </span>
+                    <span className="sm:hidden">Following </span>
+                    ({userData?.following?.length || 0})
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Content Section */}
+            <div className="container max-w-6xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
+              {activeTab === 'followers' && (
+                <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
+                  {userData?.followers.map((followerId) => (
+                    <div
+                      key={followerId}
+                      className="transform transition-all duration-300 hover:scale-105"
+                    >
+                      <UserListItem userId={followerId} />
+                    </div>
+                  ))}
+                  {!userData?.followers?.length && (
+                    <div className="col-span-full text-center py-8 sm:py-12">
+                      <div className="text-4xl sm:text-6xl mb-4">👥</div>
+                      <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No followers yet</h3>
+                      <p className="text-gray-400 text-sm sm:text-base">Keep sharing your failures!</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'following' && (
+                <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
+                  {userData?.following.map((followingId) => (
+                    <div
+                      key={followingId}
+                      className="transform transition-all duration-300 hover:scale-105"
+                    >
+                      <UserListItem userId={followingId} />
+                    </div>
+                  ))}
+                  {!userData?.following?.length && (
+                    <div className="col-span-full text-center py-8 sm:py-12">
+                      <div className="text-4xl sm:text-6xl mb-4">🔍</div>
+                      <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Not following anyone</h3>
+                      <p className="text-gray-400 text-sm sm:text-base">Find some fellow failures!</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeTab === 'posts' && (
+                <div className="space-y-4 sm:space-y-6">
+                  {posts.map((post) => (
+                    <Card
+                      key={post.id}
+                      onClick={() => router.push(`/post/${post.id}`)}
+                      className="p-4 sm:p-6 bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 transition-all duration-300 cursor-pointer backdrop-blur-sm"
+                    >
+                      <div className="flex items-start space-x-3 sm:space-x-4 mb-4">
+                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden flex-shrink-0">
+                          {userData?.profilepic ? (
+                            <img
+                              src={userData.profilepic}
+                              alt={userData.username || "Profile"}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-lg sm:text-xl font-bold bg-gray-600 text-white">
+                              {userData?.username?.[0]?.toUpperCase() || '?'}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-white text-base sm:text-lg">
+                            {userData?.username || "Anonymous"}
+                          </h3>
+                          <p className="text-xs sm:text-sm text-gray-400">
+                            {post.timestamp ? new Date(post.timestamp.toDate()).toLocaleString() : ""}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      <div className="text-gray-100 leading-relaxed whitespace-pre-wrap mb-4 p-3 sm:p-4 bg-slate-700/30 rounded-lg text-sm sm:text-base">
+                        {post.content}
+                      </div>
+
+                      <div className="flex justify-between pt-3 sm:pt-4 border-t border-slate-700">
+                        <div className="flex items-center space-x-1 sm:space-x-2 text-gray-400 hover:text-red-400 transition-colors">
+                          <ThumbsDown className="h-4 w-4 sm:h-5 sm:w-5" />
+                          <span className="text-sm">{post.dislikes || 0}</span>
+                        </div>
+                        <div className="flex items-center space-x-1 sm:space-x-2 text-gray-400 hover:text-blue-400 transition-colors">
+                          <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                          <span className="text-sm">{post.comments?.length || 0}</span>
+                        </div>
+                        <div className="flex items-center space-x-1 sm:space-x-2 text-gray-400 hover:text-green-400 transition-colors">
+                          <Link2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                          <span className="text-sm">{post.shares || 0}</span>
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                  {posts.length === 0 && (
+                    <div className="text-center py-8 sm:py-12">
+                      <div className="text-4xl sm:text-6xl mb-4">📝</div>
+                      <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No posts yet</h3>
+                      <p className="text-gray-400 text-sm sm:text-base">Share your first failure story!</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Edit Profile Modal */}
+          {isModalOpen && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto">
+              <div className="flex min-h-full items-center justify-center p-4">
+                <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                  <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-2xl p-4 sm:p-6">
+                    <div className="flex justify-between items-center mb-4 sm:mb-6">
+                      <h2 className="text-lg sm:text-xl font-semibold text-white">Edit Profile</h2>
+                      <button
+                        onClick={handleCloseModal}
+                        className="text-gray-400 hover:text-white transition-colors text-xl"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    
+                    <div className="space-y-4 sm:space-y-6">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Background Image</label>
+                        {edit.backgroundImage && (
+                          <div className="relative h-24 sm:h-32 w-full rounded-lg border-2 border-dashed border-slate-600 overflow-hidden mb-2">
+                            <img
+                              src={edit.backgroundImage}
+                              alt="Background"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <CloudinaryUploadWidget 
+                          onUploadSuccess={handleBackgroundImageUpload}
+                          variant="background"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-2">Profile Picture</label>
+                        {edit.profilepic && (
+                          <div className="relative h-24 w-24 sm:h-32 sm:w-32 rounded-full border-2 border-dashed border-slate-600 overflow-hidden mx-auto mb-2">
+                            <img
+                              src={edit.profilepic}
+                              alt="Profile"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <CloudinaryUploadWidget
+                          onUploadSuccess={handleProfileImageUpload}
+                          variant="profile"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                        <input
+                          type="text"
+                          id="username"
+                          value={edit.username}
+                          onChange={handleEditChange}
+                          className="w-full px-3 py-2 rounded-md border border-slate-600 bg-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Bio</label>
+                        <textarea
+                          id="bio"
+                          value={edit.bio}
+                          onChange={handleEditChange}
+                          rows={3}
+                          className="w-full px-3 py-2 rounded-md border border-slate-600 bg-slate-700 text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                          placeholder="Write a short bio..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-300 mb-1">Location</label>
+                        <input
+                          type="text"
+                          id="location"
+                          value={edit.location}
+                          onChange={handleEditChange}
+                          className="w-full px-3 py-2 rounded-md border border-slate-600 bg-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
+                          placeholder="Where are you located?"
+                        />
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 mt-6 sm:mt-8">
+                        <button
+                          onClick={handleCloseModal}
+                          className="px-4 py-2 text-sm font-medium rounded-md border border-slate-600 text-gray-300 hover:bg-slate-700 transition-all order-2 sm:order-1"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={handleSave}
+                          disabled={isUploading}
+                          className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
+                        >
+                          {isUploading ? (
+                            <span className="flex items-center justify-center gap-2">
+                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              Saving...
+                            </span>
+                          ) : (
+                            "Save Changes"
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

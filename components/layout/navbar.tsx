@@ -99,12 +99,11 @@ export function Navbar() {
       </div>
 
       <AnimatePresence>
-        {isMenuOpen && (
-          <motion.div
+        {isMenuOpen && (          <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-t dark:border-gray-800"
+            className="md:hidden border-t dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur-md shadow-lg"
           >
             <div className="container mx-auto px-4 py-4 space-y-3">
               {loggedIn ? (

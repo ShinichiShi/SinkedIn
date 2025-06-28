@@ -192,9 +192,9 @@ export default function UserProfile() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background/80 to-background">
+    <div className="min-h-screen bg-gradient-to-b from-background/80 to-background pt-[64px]">
       {/* Hero Section */}
-      <div className="relative w-full h-[300px]">
+      <div className="relative w-full h-[200px] md:h-[280px]">
         <div 
           className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 backdrop-blur-sm"
           style={{
@@ -207,9 +207,9 @@ export default function UserProfile() {
           <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent" />
         </div>
         
-        <div className="absolute -bottom-16 left-8 flex items-end gap-6">
+        <div className="absolute -bottom-16 left-4 md:left-8 flex flex-col md:flex-row md:items-end gap-4 md:gap-6 w-[calc(100%-2rem)]">
           <div className="relative group">
-            <div className="h-32 w-32 rounded-full border-4 border-background bg-primary/10 shadow-xl overflow-hidden transition-transform duration-300 group-hover:scale-105">
+            <div className="h-24 w-24 md:h-32 md:w-32 rounded-full border-4 border-background bg-primary/10 shadow-xl overflow-hidden transition-transform duration-300 group-hover:scale-105">
               {userData?.profilepic ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img 
@@ -225,32 +225,32 @@ export default function UserProfile() {
             </div>
           </div>
 
-          <div className="mb-4 flex flex-col gap-2">
-            <h1 className="text-3xl font-bold tracking-tight">
+          <div className="flex-1 flex flex-col gap-2">
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight">
               {userData?.username}
             </h1>
-            <p className="text-muted-foreground max-w-md">
+            <p className="text-muted-foreground max-w-md text-sm md:text-base">
               {userData?.bio || "No bio yet"}
             </p>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2 md:gap-4">
               {userData?.location && (
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
                   <span className="inline-block w-4 h-4">📍</span>
                   <span>{userData.location}</span>
                 </div>
               )}
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-2 md:gap-4">
                 <div className="px-3 py-1 rounded-full bg-secondary/10 border border-border/50 backdrop-blur-sm">
-                  <span className="text-sm font-medium">{userData?.followers?.length || 0} Followers</span>
+                  <span className="text-xs md:text-sm font-medium">{userData?.followers?.length || 0} Followers</span>
                 </div>
                 <div className="px-3 py-1 rounded-full bg-secondary/10 border border-border/50 backdrop-blur-sm">
-                  <span className="text-sm font-medium">{userData?.following?.length || 0} Following</span>
+                  <span className="text-xs md:text-sm font-medium">{userData?.following?.length || 0} Following</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="mb-4 ml-auto mr-8 flex gap-2">
+          <div className="absolute md:relative top-0 right-4 md:right-0 md:mb-4 md:ml-auto flex gap-2">
             <Button
               onClick={handleFollow}
               disabled={followLoading}
@@ -271,8 +271,8 @@ export default function UserProfile() {
         </div>
       </div>
 
-      <div className="container mx-auto mt-24 px-4">
-        <div className="flex gap-2 mb-6 border-b">
+      <div className="container mx-auto mt-24 md:mt-20 px-4 md:px-6">
+        <div className="flex gap-2 mb-6 border-b sticky top-[64px] bg-background/80 backdrop-blur-sm z-10">
           <button
             onClick={() => setActiveTab('posts')}
             className={getTabClassName('posts')}
