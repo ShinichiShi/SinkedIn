@@ -6,13 +6,14 @@ import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pencil, MapPin, Building2, GraduationCap, ThumbsDown, LogOut } from "lucide-react";
+import { Pencil, MapPin, LogOut, ThumbsDown, MessageCircle, Link2 } from "lucide-react";
 import { doc, getDoc, collection, query, getDocs, updateDoc } from "firebase/firestore";
 import { getAuth, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { firebaseApp, db } from "@/lib/firebase";
-import { HashLoader } from "react-spinners";
 import { toast } from "react-toastify";
+import { UserListItem } from "@/components/profile/user-list-item";
+import { CloudinaryUploadWidget } from "@/components/ui/cloudinary-upload-widget";
 
 interface UserData {
   username: string;
@@ -20,6 +21,7 @@ interface UserData {
   location?: string;
   bio?: string;
   profilepic?: string;
+  backgroundImage?: string;
   failedExperience?: string[];
   misEducation?: string[];
   failureHighlights?: string[];
@@ -32,9 +34,11 @@ interface Post {
   title: string;
   content: string;
   userId: string;
+  timestamp: any;
 }
 
 export default function Profile() {
+  const [activeTab, setActiveTab] = useState<'posts' | 'followers' | 'following'>('posts');
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
   const [edit, setEdit] = useState<UserData>({
@@ -43,6 +47,7 @@ export default function Profile() {
     location: "",
     bio: "",
     profilepic: "",
+    backgroundImage: "",
     failedExperience: [],
     misEducation: [],
     failureHighlights: [],
@@ -51,10 +56,9 @@ export default function Profile() {
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const router = useRouter();
+
   const fetchUserData = useCallback(async () => {
     const auth = getAuth(firebaseApp);
     const user = auth.currentUser;
@@ -78,6 +82,7 @@ export default function Profile() {
           location: fetchedUserData.location || "",
           bio: fetchedUserData.bio || "",
           profilepic: fetchedUserData.profilepic || "",
+          backgroundImage: fetchedUserData.backgroundImage || "",
           failedExperience: fetchedUserData.failedExperience || [],
           misEducation: fetchedUserData.misEducation || [],
           failureHighlights: fetchedUserData.failureHighlights || [],
@@ -127,6 +132,7 @@ export default function Profile() {
       location: userData?.location || "",
       bio: userData?.bio || "",
       profilepic: userData?.profilepic || "",
+      backgroundImage: userData?.backgroundImage || "",
       failedExperience: userData?.failedExperience || [],
       misEducation: userData?.misEducation || [],
       failureHighlights: userData?.failureHighlights || [],
@@ -184,98 +190,69 @@ export default function Profile() {
     });
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const uploadedFile = e.target.files?.[0] || null;
-    setFile(uploadedFile);
-
-    if (uploadedFile) {
-      setPreview(URL.createObjectURL(uploadedFile));
-    }
-  };
-  const uploadFile = async () => {
-    if (!file) {
-      toast.error("Please select a file first.");
-      return;
-    }
-
-    setIsUploading(true);
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        const auth = getAuth(firebaseApp);
-        const user = auth.currentUser;
-
-        if (!user) {
-          toast.error("No authenticated user found");
-          return;
-        }
-
-        setEdit(prev => ({ ...prev, profilepic: data.url }));
-        setPreview(null);
-        setFile(null);
-        toast.success("Profile picture uploaded successfully!");
-      } else {
-        throw new Error("Failed to upload file");
-      }
-    } catch (error) {
-      console.error("Error uploading file:", error);
-      toast.error("Failed to upload file");
-    } finally {
-      setIsUploading(false);
-    }
+  const handleProfileImageUpload = (url: string) => {
+    setEdit(prev => ({ ...prev, profilepic: url }));
   };
 
-  const handleProfileUpdate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleBackgroundImageUpload = (url: string) => {
+    setEdit(prev => ({ ...prev, backgroundImage: url }));
+  };
+
+  const handleImageUpload = async (url: string, type: 'profile' | 'background') => {
     const auth = getAuth(firebaseApp);
     const user = auth.currentUser;
-  
+    
     if (!user) {
-      toast.error("No authenticated user found");
+      toast.error("You must be logged in to upload images");
       return;
     }
-  
+
     try {
       const userDoc = doc(db, "users", user.uid);
-      await updateDoc(userDoc, {
-        username: edit.username,
-        bio: edit.bio,
-        location: edit.location,
-        profilepic: edit.profilepic || userData?.profilepic,
-        failedExperience: edit.failedExperience,
-        misEducation: edit.misEducation,
-        failureHighlights: edit.failureHighlights,
-        followers: edit.followers,
-        following: edit.following
-      });
-  
+      const updateData = type === 'profile' 
+        ? { profilepic: url }
+        : { backgroundImage: url };
+        
+      await updateDoc(userDoc, updateData);
+      
       setUserData(prev => ({
         ...prev!,
-        username: edit.username,
-        bio: edit.bio,
-        location: edit.location,
-        profilepic: edit.profilepic || prev?.profilepic,
-        failedExperience: edit.failedExperience,
-        misEducation: edit.misEducation,
-        failureHighlights: edit.failureHighlights,
-        followers: edit.followers,
-        following: edit.following
+        ...updateData
       }));
-  
-      toast.success("Profile successfully updated!");
-      setIsModalOpen(false);
+      
+      toast.success(`${type === 'profile' ? 'Profile' : 'Background'} image updated successfully`);
+    } catch (error) {
+      console.error("Error updating image:", error);
+      toast.error("Failed to update image");
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      setIsUploading(true);
+      const auth = getAuth(firebaseApp);
+      const user = auth.currentUser;
+      
+      if (!user) {
+        toast.error("You must be logged in to edit your profile");
+        return;
+      }
+
+      const userDoc = doc(db, "users", user.uid);
+      await updateDoc(userDoc, edit);
+
+      setUserData(prev => ({
+        ...prev!,
+        ...edit
+      }));
+
+      toast.success("Profile updated successfully");
+      handleCloseModal();
     } catch (error) {
       console.error("Error updating profile:", error);
       toast.error("Failed to update profile");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -285,282 +262,323 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <HashLoader color="white" />
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin text-primary">Loading...</div>
       </div>
     );
   }
 
+  const getTabClassName = (tab: 'posts' | 'followers' | 'following') => {
+    return activeTab === tab
+      ? 'px-4 py-2 text-sm font-medium border-b-2 border-primary text-primary'
+      : 'px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground';
+  };
+
   return (
-    <div className="container mx-auto mt-0 px-4 py-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative bg-black/20 backdrop-blur-sm rounded-2xl p-8 border border-white/10"
+    <div className="min-h-screen bg-gradient-to-b from-background/80 to-background">
+      {/* Hero Section */}
+      <div className="relative w-full h-[300px]">
+        <div 
+          className="absolute inset-0 bg-gradient-to-r from-blue-600/20 to-purple-600/20 backdrop-blur-sm"
+          style={{
+            backgroundImage: userData?.backgroundImage ? `url(${userData.backgroundImage})` : undefined,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+          }}
         >
-          <div className="flex items-start gap-6">
-            <motion.div
-              whileHover={{ scale: 1.05 }}
-              className="relative"
-            >
-              <Avatar className="w-24 h-24 border-2 border-purple-500/20">
-                <Image
-                  src={avatarSrc}
-                  alt={userData?.username || "Profile"}
-                  width={96}
-                  height={96}
-                  className="object-cover"
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-transparent" />
+        </div>
+        
+        <div className="absolute -bottom-16 left-8 flex items-end gap-6">
+          <div className="relative group">
+            <div className="h-32 w-32 rounded-full border-4 border-background bg-primary/10 shadow-xl overflow-hidden transition-transform duration-300 group-hover:scale-105">
+              {userData?.profilepic ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img 
+                  src={userData.profilepic} 
+                  alt={userData.username || "Profile"}
+                  className="w-full h-full object-cover"
                 />
-              </Avatar>
-            </motion.div>
-
-            <div className="flex-1">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h1 className="text-2xl font-bold">{userData?.username}</h1>
-                  <p className="text-gray-400">{userData?.email}</p>
-                  {userData?.location && (
-                    <div className="flex items-center gap-2 text-gray-400 mt-2">
-                      <MapPin size={16} />
-                      <span>{userData.location}</span>
-                    </div>
-                  )}
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-4xl font-bold">
+                  {userData?.username?.[0]?.toUpperCase()}
                 </div>
-                
-                <div className="flex gap-4">
-                  <div className="text-center">
-                    <div className="text-xl font-bold">{userData?.followers?.length || 0}</div>
-                    <div className="text-sm text-gray-400">Followers</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-xl font-bold">{userData?.following?.length || 0}</div>
-                    <div className="text-sm text-gray-400">Following</div>
-                  </div>
-                </div>
-              </div>
-
-              {userData?.bio && (
-                <p className="mt-4 text-gray-300">{userData.bio}</p>
               )}
             </div>
           </div>
 
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setIsModalOpen(true)}
-            className="absolute top-4 right-4 p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+          <div className="mb-4 flex flex-col gap-2">
+            <h1 className="text-3xl font-bold tracking-tight">
+              {userData?.username}
+            </h1>
+            <p className="text-muted-foreground max-w-md">
+              {userData?.bio || "No bio yet"}
+            </p>
+            <div className="flex items-center gap-4">
+              {userData?.location && (
+                <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <span className="inline-block w-4 h-4">📍</span>
+                  <span>{userData.location}</span>
+                </div>
+              )}
+              <div className="flex items-center gap-4">
+                <div className="px-3 py-1 rounded-full bg-secondary/10 border border-border/50 backdrop-blur-sm">
+                  <span className="text-sm font-medium">{userData?.followers?.length || 0} Followers</span>
+                </div>
+                <div className="px-3 py-1 rounded-full bg-secondary/10 border border-border/50 backdrop-blur-sm">
+                  <span className="text-sm font-medium">{userData?.following?.length || 0} Following</span>
+                </div>
+              </div>
+            </div>
+          </div>          <div className="mb-4 ml-auto mr-8 flex gap-2">
+            <CloudinaryUploadWidget
+              onUploadSuccess={(url) => handleImageUpload(url, 'profile')}
+              variant="profile"
+            />
+            <CloudinaryUploadWidget
+              onUploadSuccess={(url) => handleImageUpload(url, 'background')}
+              variant="background"
+            />
+            <Button
+              onClick={handleLogout}
+              variant="destructive"
+              size="sm"
+              className="gap-2"
+            >
+              <span className="inline-block w-4 h-4">🚪</span>
+              Logout
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto mt-24 px-4">
+        <div className="flex gap-2 mb-6 border-b">
+          <button
+            onClick={() => setActiveTab('posts')}
+            className={getTabClassName('posts')}
           >
-            <Pencil size={20} />
-          </motion.button>
-        </motion.div>
-
-        <AnimatePresence>
-        {isModalOpen && (
-  <motion.div
-    className="fixed inset-0 bg-[rgba(0,0,0,0.83)] flex justify-center items-center z-50 p-4"
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
-    transition={{ duration: 0.3 }}
-    style={{ margin: 0, padding: 0 }}
-  >
-    <motion.div
-      className="bg-background p-6 rounded-lg w-full max-w-5xl shadow-lg max-h-[90vh] overflow-y-auto"
-      initial={{ scale: 0.8, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      exit={{ scale: 0.8, opacity: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <h2 className="text-2xl font-semibold mb-6">Edit Profile</h2>
-      <form onSubmit={handleProfileUpdate} className="space-y-6">
-        <div className="grid md:grid-cols-3 gap-4">
-          <div>
-          <div className="mb-4">
-            <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-              Name
-            </label>
-            <input
-              type="text"
-              id="username"
-              className="block w-full p-2 border border-border rounded-lg"
-              value={edit.username}
-              onChange={handleEditChange}
-            />
-          </div>
-          <div className="mb-4">
-            <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
-              Location
-            </label>
-            <input
-              id="location"
-              type="text"
-              className="block w-full p-2 border border-border rounded-lg"
-              value={edit.location}
-              onChange={handleEditChange}
-            />
-          </div>
+            Posts
+          </button>
+          <button
+            onClick={() => setActiveTab('followers')}
+            className={getTabClassName('followers')}
+          >
+            Followers
+          </button>
+          <button
+            onClick={() => setActiveTab('following')}
+            className={getTabClassName('following')}
+          >
+            Following
+          </button>
         </div>
 
-        <div className="mb-4">
-          <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-2">
-            Bio
-          </label>
-          <textarea
-            id="bio"
-            rows={4}
-            className="block w-full p-2 border border-border rounded-lg no-scrollbar"
-            value={edit.bio}
-            onChange={handleEditChange}
-          />
-        </div>
+        <div className="mt-6">
+          {activeTab === 'posts' && (
+            <div className="grid gap-6">
+              {posts.map((post) => (
+                <div
+                  key={post.id}
+                  onClick={() => router.push(`/post/${post.id}`)}
+                  className="p-6 rounded-lg border border-border/40 bg-card/30 backdrop-blur-sm transition-all duration-300 hover:border-border hover:bg-card/50 group cursor-pointer"
+                >
+                  <div className="flex items-center space-x-4 mb-4">
+                    <div className="w-12 h-12 rounded-full overflow-hidden relative ring-2 ring-primary/20 ring-offset-2 ring-offset-background">
+                      {userData?.profilepic ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={userData.profilepic}
+                          alt={userData.username || "Profile"}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-xl font-bold bg-primary/10">
+                          {userData?.username?.[0]?.toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-lg group-hover:text-primary transition-colors">
+                        {userData?.username || "Anonymous"}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {post.timestamp ? new Date(post.timestamp.toDate()).toLocaleString() : ""}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="text-base text-foreground/90 leading-relaxed whitespace-pre-wrap px-4 py-2 rounded-lg bg-accent/5">
+                    {post.content}
+                  </div>
 
-        <div className="mb-4">
-        <label htmlFor="profilepic" className="block text-sm font-medium mb-2">
-                  Profile Picture
-                </label>
-                
-                {preview && (
-                  <Image
-                    src={preview}
-                    alt="Profile Preview"
-                    width={5}
-                    height={5}
-                    loading="lazy"
-                    className="mt-2 w-32 h-32 object-cover rounded-full"
+                  <div className="flex justify-around pt-4 mt-4 border-t border-border/30">
+                    <div className="flex items-center space-x-2 text-muted-foreground">
+                      <ThumbsDown className="h-5 w-5" />
+                      <span>{post.dislikes || 0}</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-muted-foreground">
+                      <MessageCircle className="h-5 w-5" />
+                      <span>{post.comments?.length || 0}</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-muted-foreground">
+                      <Link2 className="h-5 w-5" />
+                      <span>{post.shares || 0}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {posts.length === 0 && (
+                <div className="text-center text-muted-foreground">
+                  No posts yet. Share your first failure story!
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'followers' && (
+            <div className="grid gap-4">
+              {userData?.followers.map((followerId) => (
+                <UserListItem key={followerId} userId={followerId} />
+              ))}
+              {!userData?.followers.length && (
+                <div className="text-center text-muted-foreground">
+                  No followers yet. Keep sharing your failures!
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'following' && (
+            <div className="grid gap-4">
+              {userData?.following.map((followingId) => (
+                <UserListItem key={followingId} userId={followingId} />
+              ))}
+              {!userData?.following.length && (
+                <div className="text-center text-muted-foreground">
+                  You&apos;re not following anyone yet. Find some fellow failures!
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50">
+          <div className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] w-full max-w-lg">
+            <div className="bg-card border rounded-lg shadow-lg p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Edit Profile</h2>
+                <button
+                  onClick={handleCloseModal}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="space-y-6">                <div>
+                  <label className="block text-sm font-medium mb-2">Background Image</label>
+                  {edit.backgroundImage ? (
+                    <div className="relative h-32 w-full rounded-lg border-2 border-dashed border-border/50 overflow-hidden group">
+                      <Image
+                        src={edit.backgroundImage}
+                        alt="Background"
+                        fill
+                        className="object-cover group-hover:opacity-75 transition-opacity"
+                      />
+                    </div>
+                  ) : null}
+                  <div className="mt-2">
+                    <CloudinaryUploadWidget 
+                      onUploadSuccess={handleBackgroundImageUpload}
+                      variant="background"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Profile Picture</label>
+                  {edit.profilepic ? (
+                    <div className="relative h-32 w-32 rounded-full border-2 border-dashed border-border/50 overflow-hidden group mb-2">
+                      <Image
+                        src={edit.profilepic}
+                        alt="Profile"
+                        fill
+                        className="object-cover"
+                      />
+                    </div>
+                  ) : null}
+                  <div className="mt-2">
+                    <CloudinaryUploadWidget
+                      onUploadSuccess={handleProfileImageUpload}
+                      variant="profile"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Username</label>
+                  <input
+                    type="text"
+                    id="username"
+                    value={edit.username}
+                    onChange={handleEditChange}
+                    className="w-full px-3 py-2 rounded-md border bg-background"
                   />
-                )}
-                <input
-                  id="profilepic"
-                  type="file"
-                  onChange={handleFileChange}
-                  className="block w-full p-2 border rounded-lg"
-                />
-                <Button 
-                    variant="outline" 
-                    type="button"
-                    onClick={uploadFile} 
-                    className="mt-2" 
-                    disabled={isUploading}
-                  >
-                    {isUploading ? "Uploading..." : "Upload Profile Picture"}
-                  </Button>
-             
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Bio</label>
+                  <textarea
+                    id="bio"
+                    value={edit.bio}
+                    onChange={handleEditChange}
+                    rows={3}
+                    className="w-full px-3 py-2 rounded-md border bg-background resize-none"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium mb-1">Location</label>
+                  <input
+                    type="text"
+                    id="location"
+                    value={edit.location}
+                    onChange={handleEditChange}
+                    className="w-full px-3 py-2 rounded-md border bg-background"
+                  />
+                </div>
+              </div>
 
-        </div>
-        </div>
-          <div>
-        <div className="mb-4">
-        <label htmlFor="failedExperience" className="block text-sm font-medium text-gray-700">
-          Failed Experience
-        </label>
-        {edit.failedExperience?.map((experience, index) => (
-          <div key={index} className="flex items-center gap-2 mb-2">
-            <input
-              type="text"
-              value={experience}
-              onChange={(e) => handleArrayEdit('failedExperience', index, e.target.value)}
-              className="mt-1 block w-full p-2 border border-border rounded-lg"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => handleRemoveArrayItem('failedExperience', index)}
-            >
-              Remove
-            </Button>
-          </div>
-        ))}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => handleAddArrayItem('failedExperience')}
-        >
-          Add Experience
-        </Button>
-      </div>
-      
-      <div className="mb-4">
-        <label htmlFor="misEducation" className="block text-sm font-medium text-gray-700">
-          Mis-Education
-        </label>
-        {edit.misEducation?.map((education, index) => (
-          <div key={index} className="flex items-center gap-2 mb-2">
-            <input
-              type="text"
-              value={education}
-              onChange={(e) => handleArrayEdit('misEducation', index, e.target.value)}
-              className="mt-1 block w-full p-2 border border-border rounded-lg"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => handleRemoveArrayItem('misEducation', index)}
-            >
-              Remove
-            </Button>
-          </div>
-        ))}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => handleAddArrayItem('misEducation')}
-        >
-          Add Education
-        </Button>
-      </div>
-      
-      <div className="mb-4">
-        <label htmlFor="failureHighlights" className="block text-sm font-medium text-gray-700">
-          Failure Highlights
-        </label>
-        {edit.failureHighlights?.map((highlight, index) => (
-          <div key={index} className="flex items-center gap-2 mb-2">
-            <input
-              type="text"
-              value={highlight}
-              onChange={(e) => handleArrayEdit('failureHighlights', index, e.target.value)}
-              className="mt-1 block w-full p-2 border border-border rounded-lg"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => handleRemoveArrayItem('failureHighlights', index)}
-            >
-              Remove
-            </Button>
-          </div>
-        ))}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => handleAddArrayItem('failureHighlights')}
-        >
-          Add Highlight
-        </Button>
-      </div>
-      </div>
-        <div className="space-y-6">
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" type="button" onClick={handleCloseModal}>
-              Cancel
-            </Button>
-            <Button type="submit">Save</Button>
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 text-sm font-medium rounded-md hover:bg-secondary/80 border border-border/50 transition-all hover:border-border"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={isUploading}
+                  className="px-4 py-2 text-sm font-medium rounded-md bg-primary text-primary-foreground hover:bg-primary/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg"
+                >
+                  {isUploading ? (
+                    <span className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white/90 rounded-full animate-spin" />
+                      Saving...
+                    </span>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-      </form>
-    </motion.div>
-  </motion.div>
-)}
-        </AnimatePresence>
-      </div>
+      )}
     </div>
   );
 }
