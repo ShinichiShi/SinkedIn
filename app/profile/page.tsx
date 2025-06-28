@@ -23,6 +23,8 @@ interface UserData {
   failedExperience?: string[];
   misEducation?: string[];
   failureHighlights?: string[];
+  followers: string[];
+  following: string[];
 }
 
 interface Post {
@@ -43,7 +45,9 @@ export default function Profile() {
     profilepic: "",
     failedExperience: [],
     misEducation: [],
-    failureHighlights: []
+    failureHighlights: [],
+    followers: [],
+    following: []
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -76,37 +80,34 @@ export default function Profile() {
           profilepic: fetchedUserData.profilepic || "",
           failedExperience: fetchedUserData.failedExperience || [],
           misEducation: fetchedUserData.misEducation || [],
-          failureHighlights: fetchedUserData.failureHighlights || []
+          failureHighlights: fetchedUserData.failureHighlights || [],
+          followers: fetchedUserData.followers || [],
+          following: fetchedUserData.following || []
         });
-      } else {
-        console.error("No user document found!");
-        setUserData(null);
       }
     
-      const postsCollection = collection(db, "posts"); 
-      const postsQuery = query(postsCollection); 
-    
-      const querySnapshot = await getDocs(postsQuery); 
-      const fetchedPosts: Post[] = querySnapshot.docs
+      const postsCollection = collection(db, "posts");
+      const postsQuery = query(postsCollection);
+      const querySnapshot = await getDocs(postsQuery);
+      const fetchedPosts = querySnapshot.docs
         .map((doc) => ({
           id: doc.id,
-          ...(doc.data() as Omit<Post, "id">), 
+          ...(doc.data() as Omit<Post, "id">),
         }))
-        .filter((post) => post.userId === user.uid); 
+        .filter((post) => post.userId === user.uid);
     
-      setPosts(fetchedPosts); 
+      setPosts(fetchedPosts);
     } catch (error) {
       console.error("Error fetching user data or posts:", error);
       toast.error("Failed to fetch user data");
     } finally {
       setLoading(false);
     }
-}, [router]);
-    
+  }, [router]);
+
   useEffect(() => {
     fetchUserData();
   }, [fetchUserData]);
-
 
   const handleLogout = async () => {
     try {
@@ -128,7 +129,9 @@ export default function Profile() {
       profilepic: userData?.profilepic || "",
       failedExperience: userData?.failedExperience || [],
       misEducation: userData?.misEducation || [],
-      failureHighlights: userData?.failureHighlights || []
+      failureHighlights: userData?.failureHighlights || [],
+      followers: userData?.followers || [],
+      following: userData?.following || []
     });
     setIsModalOpen(true);
   };
@@ -242,9 +245,6 @@ export default function Profile() {
     }
   
     try {
-      // if(preview!==null)
-      //   await uploadFile()
-
       const userDoc = doc(db, "users", user.uid);
       await updateDoc(userDoc, {
         username: edit.username,
@@ -253,7 +253,9 @@ export default function Profile() {
         profilepic: edit.profilepic || userData?.profilepic,
         failedExperience: edit.failedExperience,
         misEducation: edit.misEducation,
-        failureHighlights: edit.failureHighlights
+        failureHighlights: edit.failureHighlights,
+        followers: edit.followers,
+        following: edit.following
       });
   
       setUserData(prev => ({
@@ -264,26 +266,30 @@ export default function Profile() {
         profilepic: edit.profilepic || prev?.profilepic,
         failedExperience: edit.failedExperience,
         misEducation: edit.misEducation,
-        failureHighlights: edit.failureHighlights
+        failureHighlights: edit.failureHighlights,
+        followers: edit.followers,
+        following: edit.following
       }));
   
       toast.success("Profile successfully updated!");
-      setIsModalOpen(false)
+      setIsModalOpen(false);
     } catch (error) {
       console.error("Error updating profile:", error);
       toast.error("Failed to update profile");
     }
   };
 
-  if (loading) return (
-    <div className="flex h-screen items-center justify-center">
-      <HashLoader color="white"/>
-    </div>
-  );
-
   // Default avatar if not provided
   const avatarSrc = userData?.profilepic || 
     "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png";
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <HashLoader color="white" />
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto mt-0 px-4 py-8">
@@ -291,104 +297,63 @@ export default function Profile() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
+          className="relative bg-black/20 backdrop-blur-sm rounded-2xl p-8 border border-white/10"
         >
-          <Card className="relative">
-            <div className="h-32 bg-gradient-to-r from-red-400 to-red-600 rounded-t-lg"></div>
-            <div className="p-6">
-              <Avatar className="w-32 h-32 mt-[10%] border-4 border-background absolute -top-16 left-6">
-                <AvatarImage 
-                  src={avatarSrc} 
-                  alt={`${userData?.username || 'User'}'s avatar`} 
-                  className="rounded-full object-cover"
-                  loading="lazy"
+          <div className="flex items-start gap-6">
+            <motion.div
+              whileHover={{ scale: 1.05 }}
+              className="relative"
+            >
+              <Avatar className="w-24 h-24 border-2 border-purple-500/20">
+                <Image
+                  src={avatarSrc}
+                  alt={userData?.username || "Profile"}
+                  width={96}
+                  height={96}
+                  className="object-cover"
                 />
-                <AvatarFallback>{userData?.username?.[0] || 'U'}</AvatarFallback>
               </Avatar>
-              <div className="mt-16">
-              <div className="flex flex-col sm:flex-row justify-between items-start space-y-2 sm:space-y-0">
+            </motion.div>
+
+            <div className="flex-1">
+              <div className="flex justify-between items-start">
                 <div>
-                  <h1 className="text-2xl font-bold">{userData?.username || "User"}</h1>
-                  <p className="text-muted-foreground">{userData?.email}</p>
-                  <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                    <MapPin className="h-4 w-4" />
-                    <span>{userData?.location || "Unknown location"}</span>
+                  <h1 className="text-2xl font-bold">{userData?.username}</h1>
+                  <p className="text-gray-400">{userData?.email}</p>
+                  {userData?.location && (
+                    <div className="flex items-center gap-2 text-gray-400 mt-2">
+                      <MapPin size={16} />
+                      <span>{userData.location}</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex gap-4">
+                  <div className="text-center">
+                    <div className="text-xl font-bold">{userData?.followers?.length || 0}</div>
+                    <div className="text-sm text-gray-400">Followers</div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <Button variant="outline" size="sm" className="w-full sm:w-auto" onClick={handleOpenModal}>
-                    <Pencil className="h-4 w-4 mr-2" />
-                    Edit
-                  </Button>
-                  <Button variant="ghost" size="sm" className="w-full sm:w-auto border border-border" onClick={handleLogout}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Logout
-                  </Button>
-                </div>
-              </div>
-                <div className="mt-6">
-                  <p className="text-sm text-muted-foreground">{userData?.bio || "No bio available"}</p>
-                </div>
-
-                <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card className="p-4">
-                    <h3 className="font-semibold flex items-center gap-2">
-                      <Building2 className="h-4 w-4" />
-                      Failed Experience
-                    </h3>
-                    <ul className="mt-2 space-y-2">
-                      {userData?.failedExperience?.map((experience, index) => (
-                        <li key={index} className="text-sm text-muted-foreground">• {experience}</li>
-                      ))}
-                    </ul>
-                  </Card>
-
-                  <Card className="p-4">
-                    <h3 className="font-semibold flex items-center gap-2">
-                      <GraduationCap className="h-4 w-4" />
-                      Mis-Education
-                    </h3>
-                    <ul className="mt-2 space-y-2">
-                      {userData?.misEducation?.map((education, index) => (
-                        <li key={index} className="text-sm text-muted-foreground">• {education}</li>
-                      ))}
-                    </ul>
-                  </Card>
-                </div>
-
-                <div className="mt-6">
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <ThumbsDown className="h-4 w-4" />
-                    Failure Highlights
-                  </h3>
-                  <div className="flex gap-2 flex-wrap">
-                    {userData?.failureHighlights?.map((highlight, index) => (
-                      <span key={index} className="px-3 py-1 bg-muted rounded-full text-sm">
-                        {highlight}
-                      </span>
-                    ))}
-                  </div> 
-                </div>
-
-                {/* User Posts Section */}
-                <div className="mt-8">
-                  <h3 className="font-semibold mb-3">Your Posts</h3>
-                  <div className="space-y-4">
-                    {posts.length === 0 ? (
-                      <p>No posts yet</p>
-                    ) : (
-                      posts.map((post) => (
-                        <Card key={post.id} className="p-4">
-                          <h4 className="font-semibold text-lg">{post.title}</h4>
-                          <p className="text-sm text-muted-foreground">{post.content}</p>
-                        </Card>
-                      ))
-                    )}
+                  <div className="text-center">
+                    <div className="text-xl font-bold">{userData?.following?.length || 0}</div>
+                    <div className="text-sm text-gray-400">Following</div>
                   </div>
                 </div>
               </div>
+
+              {userData?.bio && (
+                <p className="mt-4 text-gray-300">{userData.bio}</p>
+              )}
             </div>
-          </Card> 
+          </div>
+
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setIsModalOpen(true)}
+            className="absolute top-4 right-4 p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+          >
+            <Pencil size={20} />
+          </motion.button>
         </motion.div>
 
         <AnimatePresence>

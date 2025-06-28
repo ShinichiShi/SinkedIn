@@ -26,6 +26,8 @@ interface UserData {
   failedExperience?: string[];
   misEducation?: string[];
   failureHighlights?: string[];
+  followers: string[];  // Array of user IDs who follow this user
+  following: string[];  // Array of user IDs this user follows
 }
 
 const mergeUserData = async (user: any): Promise<UserData> => {
@@ -43,7 +45,9 @@ const mergeUserData = async (user: any): Promise<UserData> => {
       profilepic: existingData.profilepic || "",
       failedExperience: existingData.failedExperience || [],
       misEducation: existingData.misEducation || [],
-      failureHighlights: existingData.failureHighlights || []
+      failureHighlights: existingData.failureHighlights || [],
+      followers: existingData.followers || [],
+      following: existingData.following || []
     };
 
     await setDoc(userDocRef, updatedUserData, { merge: true });

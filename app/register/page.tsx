@@ -16,6 +16,17 @@ import {
 import { getAuth } from "firebase/auth";
 import { firebaseApp } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
+import { doc, setDoc } from "firebase/firestore";
+import { toast } from "react-toastify";
+
+interface UserData {
+  username: string;
+  email: string;
+  bio?: string;
+  profilepic?: string;
+  followers: string[];
+  following: string[];
+}
 
 export default function Signup() {
   const [username, setUsername] = useState("");
@@ -26,14 +37,36 @@ export default function Signup() {
   const router = useRouter();
   const auth = getAuth(firebaseApp);
 
+  const initializeUserDocument = async (user: any) => {
+    try {
+      const userRef = doc(db, "users", user.uid);
+      const userData: UserData = {
+        username: user.displayName || username || "Anonymous",
+        email: user.email,
+        bio: "",
+        profilepic: user.photoURL || "",
+        followers: [],
+        following: []
+      };
+      
+      await setDoc(userRef, userData);
+      toast.success("Account created successfully!");
+    } catch (error) {
+      console.error("Error creating user document:", error);
+      toast.error("Error creating user profile");
+    }
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     try {
-      await signup(email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await initializeUserDocument(userCredential.user);
       router.push("/");
     } catch (err: any) {
       setError(err.message);
+      toast.error("Failed to create account");
     }
   };
 

@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import Image from "next/image";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
 import { Card } from "@/components/ui/card";
 import { Avatar } from "@/components/ui/avatar";
 import { motion } from "framer-motion";
@@ -10,12 +10,15 @@ import { useRouter } from "next/navigation";
 import { firebaseApp } from "@/lib/firebase";
 import { getAuth } from "firebase/auth";
 import { HashLoader } from "react-spinners";
+import { toast } from "react-toastify";
 
 type User = {
   id: string;
   username: string;
   email: string;
-  profilepic?: string; 
+  profilepic?: string;
+  followers: string[];
+  following: string[];
 };
 
 export default function NetworkPage() {
@@ -61,6 +64,88 @@ export default function NetworkPage() {
     setFilteredUsers(filtered);
   }, [searchQuery, users]);
 
+  const handleFollow = async (targetUserId: string) => {
+    const auth = getAuth(firebaseApp);
+    const currentUser = auth.currentUser;
+    
+    if (!currentUser) {
+      toast.error("Please log in to follow users");
+      router.push("/login");
+      return;
+    }
+
+    try {
+      // Update current user's following list
+      const currentUserRef = doc(db, "users", currentUser.uid);
+      await updateDoc(currentUserRef, {
+        following: arrayUnion(targetUserId)
+      });
+
+      // Update target user's followers list
+      const targetUserRef = doc(db, "users", targetUserId);
+      await updateDoc(targetUserRef, {
+        followers: arrayUnion(currentUser.uid)
+      });
+
+      // Update local state
+      setUsers(users.map(user => {
+        if (user.id === targetUserId) {
+          return {
+            ...user,
+            followers: [...(user.followers || []), currentUser.uid]
+          };
+        }
+        return user;
+      }));
+
+      toast.success("Successfully followed user!");
+    } catch (error) {
+      console.error("Error following user:", error);
+      toast.error("Failed to follow user");
+    }
+  };
+
+  const handleUnfollow = async (targetUserId: string) => {
+    const auth = getAuth(firebaseApp);
+    const currentUser = auth.currentUser;
+    
+    if (!currentUser) {
+      toast.error("Please log in to unfollow users");
+      router.push("/login");
+      return;
+    }
+
+    try {
+      // Remove from current user's following list
+      const currentUserRef = doc(db, "users", currentUser.uid);
+      await updateDoc(currentUserRef, {
+        following: arrayRemove(targetUserId)
+      });
+
+      // Remove from target user's followers list
+      const targetUserRef = doc(db, "users", targetUserId);
+      await updateDoc(targetUserRef, {
+        followers: arrayRemove(currentUser.uid)
+      });
+
+      // Update local state
+      setUsers(users.map(user => {
+        if (user.id === targetUserId) {
+          return {
+            ...user,
+            followers: user.followers?.filter(id => id !== currentUser.uid) || []
+          };
+        }
+        return user;
+      }));
+
+      toast.success("Successfully unfollowed user!");
+    } catch (error) {
+      console.error("Error unfollowing user:", error);
+      toast.error("Failed to unfollow user");
+    }
+  };
+
   if (loading)
     return (
       <div className="flex h-screen items-center justify-center">
@@ -69,63 +154,75 @@ export default function NetworkPage() {
     );
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Network</h1>
-
-      {/* Search Input */}
-      <div className="mb-6">
+    <div className="min-h-screen bg-black text-white p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8">Network</h1>
         <input
           type="text"
-          placeholder="Search by username or email..."
-          className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Search users..."
+          className="w-full p-4 mb-8 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500/50 focus:outline-none"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
+        
+        {loading ? (
+          <div className="flex justify-center">
+            <HashLoader color="white" />
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6">
+            {filteredUsers.map((user) => {
+              const auth = getAuth(firebaseApp);
+              const currentUser = auth.currentUser;
+              const isFollowing = currentUser && user.followers?.includes(currentUser.uid);
+              const isCurrentUser = currentUser && user.id === currentUser.uid;
+
+              return (
+                <motion.div
+                  key={user.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-6 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300"
+                >
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                    <Avatar className="w-16 h-16 border-2 border-purple-500/20">
+                      <Image
+                        src={user.profilepic || defaultAvatar}
+                        alt={user.username}
+                        width={64}
+                        height={64}
+                        className="object-cover"
+                      />
+                    </Avatar>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold">{user.username}</h3>
+                      <p className="text-gray-400">{user.email}</p>
+                      <div className="flex gap-4 mt-2 text-sm text-gray-400">
+                        <span>{user.followers?.length || 0} followers</span>
+                        <span>{user.following?.length || 0} following</span>
+                      </div>
+                    </div>
+                    {!isCurrentUser && (
+                      <motion.button
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => isFollowing ? handleUnfollow(user.id) : handleFollow(user.id)}
+                        className={`px-6 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-300 ${
+                          isFollowing 
+                            ? 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-500'
+                            : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90'
+                        }`}
+                      >
+                        {isFollowing ? 'Unfollow' : 'Follow'}
+                      </motion.button>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        )}
       </div>
-
-      {/* Display Users */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-        {filteredUsers.map((user) => (
-          <motion.div
-            key={user.id}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.3 }}
-          >
-            <Card
-              className="p-4 shadow-md hover:shadow-lg transition-shadow cursor-pointer"
-              onClick={() => router.push(`/networkpost/${user.id}`)} // Navigate to user posts
-            >
-              <div className="flex flex-col items-center">
-                <Avatar className="w-24 h-24 mb-4">
-                <Image
-                    src={`${user?.profilepic||"https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"}`}
-                    height={100} 
-                    width={100}
-                    loading="lazy"
-                    alt={`${user?.username || "User"}'s avatar`}
-                    className="rounded-full"
-                  />
-
-                </Avatar>
-                <h2 className="text-lg font-semibold">
-                  {user.username || "Anonymous"}
-                </h2>
-                <p className="text-sm text-muted-foreground">
-                  {user.email || "No email available"}
-                </p>
-              </div>
-            </Card>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* No Results Message */}
-      {filteredUsers.length === 0 && (
-        <p className="text-center text-gray-500 mt-4">
-          No users match your search query.
-        </p>
-      )}
     </div>
   );
 }

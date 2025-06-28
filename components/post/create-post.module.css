@@ -1,0 +1,141 @@
+@keyframes float {
+  0% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+  100% {
+    transform: translateY(0px);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 0.4;
+    transform: scale(0.98);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 0.4;
+    transform: scale(0.98);
+  }
+}
+
+.container {
+  position: relative;
+  margin-bottom: 20px;
+  transition: all 0.5s ease;
+}
+
+.container:hover {
+  transform: translateY(-4px);
+}
+
+.glow {
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(45deg, 
+    rgba(139, 92, 246, 0.3),
+    rgba(236, 72, 153, 0.3),
+    rgba(234, 88, 12, 0.3)
+  );
+  border-radius: 16px;
+  filter: blur(20px);
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  animation: pulse 4s ease-in-out infinite;
+}
+
+.container:hover .glow {
+  opacity: 1;
+}
+
+.content {
+  position: relative;
+  z-index: 1;
+  background: rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(12px);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.5s ease;
+}
+
+.container:hover .content {
+  border-color: rgba(139, 92, 246, 0.2);
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.1),
+    0 2px 8px rgba(139, 92, 246, 0.1);
+}
+
+.avatar {
+  transition: all 0.3s ease;
+}
+
+.avatar:hover {
+  transform: scale(1.1);
+}
+
+.textarea {
+  transition: all 0.3s ease;
+}
+
+.textarea:focus {
+  transform: scale(1.005);
+}
+
+.button {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.button:hover {
+  transform: translateY(-2px);
+}
+
+.button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(45deg, 
+    rgba(139, 92, 246, 0.2),
+    rgba(236, 72, 153, 0.2)
+  );
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.button:hover::before {
+  opacity: 1;
+}
+
+.mainButton {
+  background: linear-gradient(45deg, 
+    rgb(139, 92, 246),
+    rgb(236, 72, 153)
+  );
+  position: relative;
+  overflow: hidden;
+}
+
+.mainButton::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(45deg,
+    rgba(139, 92, 246, 1),
+    rgba(236, 72, 153, 1)
+  );
+  opacity: 0;
+  transition: all 0.5s ease;
+  transform: translateX(-100%);
+}
+
+.mainButton:hover::before {
+  opacity: 1;
+  transform: translateX(0);
+}

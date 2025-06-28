@@ -8,10 +8,23 @@ import { firebaseApp } from "@/lib/firebase";
 import { getAuth } from "firebase/auth";
 import { HashLoader as Loader } from "react-spinners";
 import { toast } from "react-toastify";
-import { collection, query, orderBy, limit, startAfter, getDocs, doc, updateDoc, increment } from "firebase/firestore";
+import { 
+  collection, 
+  query, 
+  orderBy, 
+  limit, 
+  startAfter, 
+  getDocs, 
+  doc, 
+  getDoc,
+  updateDoc, 
+  increment,
+  arrayUnion,
+  arrayRemove 
+} from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { motion } from "framer-motion";
-import { ThumbsDown, MessageCircle, Link2 } from "lucide-react";
+import { ThumbsDown, MessageCircle, Link2, UserPlus, UserMinus } from "lucide-react";
 import Image from "next/image";
 import type { ReactElement, FC, ReactNode } from 'react';
 import type { ForwardRefComponent } from 'framer-motion';
@@ -21,6 +34,7 @@ type Post = {
   content: string;
   userName: string;
   userProfilePic?: string;
+  userId: string;
   timestamp: { seconds: number } | null;
   createdAt?: string;
   dislikes: number;
@@ -54,10 +68,13 @@ export default function Feed(): ReactElement {
   const [lastVisible, setLastVisible] = useState<any>(null);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const observerTarget = useRef<HTMLDivElement>(null);  const [dislikedPosts, setDislikedPosts] = useState<string[]>([]);
+  const observerTarget = useRef<HTMLDivElement>(null);
+  const [dislikedPosts, setDislikedPosts] = useState<string[]>([]);
   const [commentBoxStates, setCommentBoxStates] = useState<{[key: string]: boolean}>({});
   const [commentInputs, setCommentInputs] = useState<{[key: string]: string}>({});
-
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [userFollowing, setUserFollowing] = useState<string[]>([]);
+  
   const fetchInitialPosts = async () => {
     try {
       // Create a compound query to handle both server timestamp and client timestamp
@@ -294,6 +311,89 @@ export default function Feed(): ReactElement {
     }
   }, [router]);
 
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const auth = getAuth(firebaseApp);
+        const user = auth.currentUser;
+        if (user) {
+          setCurrentUser(user);
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setUserFollowing(userData.following || []);
+          }
+        } else {
+          router.push("/login");
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    };
+
+    fetchUserData();
+  }, [router]);
+
+  const handleFollow = async (targetUserId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!currentUser) {
+      toast.error("Please log in to follow users");
+      router.push("/login");
+      return;
+    }
+
+    try {
+      // Update current user's following list
+      const currentUserRef = doc(db, "users", currentUser.uid);
+      await updateDoc(currentUserRef, {
+        following: arrayUnion(targetUserId)
+      });
+
+      // Update target user's followers list
+      const targetUserRef = doc(db, "users", targetUserId);
+      await updateDoc(targetUserRef, {
+        followers: arrayUnion(currentUser.uid)
+      });
+
+      // Update local state
+      setUserFollowing(prev => [...prev, targetUserId]);
+      toast.success("Successfully followed user!");
+    } catch (error) {
+      console.error("Error following user:", error);
+      toast.error("Failed to follow user");
+    }
+  };
+
+  const handleUnfollow = async (targetUserId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!currentUser) {
+      toast.error("Please log in to unfollow users");
+      router.push("/login");
+      return;
+    }
+
+    try {
+      // Update current user's following list
+      const currentUserRef = doc(db, "users", currentUser.uid);
+      await updateDoc(currentUserRef, {
+        following: arrayRemove(targetUserId)
+      });
+
+      // Update target user's followers list
+      const targetUserRef = doc(db, "users", targetUserId);
+      await updateDoc(targetUserRef, {
+        followers: arrayRemove(currentUser.uid)
+      });
+
+      // Update local state
+      setUserFollowing(prev => prev.filter(id => id !== targetUserId));
+      toast.success("Successfully unfollowed user!");
+    } catch (error) {
+      console.error("Error unfollowing user:", error);
+      toast.error("Failed to unfollow user");
+    }
+  };
+
   if (loading) return (
     <div className="flex h-screen items-center justify-center">
       <div><Loader loading={true} size={50} color="white" /></div>
@@ -322,13 +422,15 @@ export default function Feed(): ReactElement {
                   alt={`${post.userName}'s avatar`}
                   className="w-full h-full object-cover"
                 />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-lg text-foreground hover:text-primary transition-colors duration-200">{post.userName || "Anonymous"}</h3>
-                <p className="text-sm text-muted-foreground/80">
-                  {post.timestamp?.seconds ? new Date(post.timestamp.seconds * 1000).toLocaleString() : 
-                   post.createdAt ? new Date(post.createdAt).toLocaleString() : ""}
-                </p>
+              </div>              <div className="flex-1">
+                <div className="flex justify-between items-start">                  <div>
+                    <h3 className="font-semibold text-lg text-foreground hover:text-primary transition-colors duration-200">{post.userName || "Anonymous"}</h3>
+                    <p className="text-sm text-muted-foreground/80">
+                      {post.timestamp?.seconds ? new Date(post.timestamp.seconds * 1000).toLocaleString() : 
+                      post.createdAt ? new Date(post.createdAt).toLocaleString() : ""}
+                    </p>
+                  </div>
+                </div>
               </div>
             </div>
               <div className="text-base text-gray-800 dark:text-foreground/90 leading-relaxed whitespace-pre-wrap px-4 py-2 rounded-lg bg-gray-50 dark:bg-accent/5">
@@ -369,6 +471,28 @@ export default function Feed(): ReactElement {
                 <div><Link2 className="h-5 w-5" /></div>
                 <span>{post.shares || 0}</span>
               </MotionButton>
+
+              {currentUser && post.userId !== currentUser.uid && (
+                userFollowing.includes(post.userId) ? (
+                  <MotionButton
+                    whileTap={{ scale: 0.95 }}
+                    onClick={(e) => handleUnfollow(post.userId, e)}
+                    className="flex items-center space-x-2 rounded-full px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 transition-all duration-200"
+                  >
+                    <div><UserMinus className="h-5 w-5" /></div>
+                    <span>Unfollow</span>
+                  </MotionButton>
+                ) : (
+                  <MotionButton
+                    whileTap={{ scale: 0.95 }}
+                    onClick={(e) => handleFollow(post.userId, e)}
+                    className="flex items-center space-x-2 rounded-full px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 transition-all duration-200"
+                  >
+                    <div><UserPlus className="h-5 w-5" /></div>
+                    <span>Follow</span>
+                  </MotionButton>
+                )
+              )}
             </div>
 
             {commentBoxStates[post.id] && (
