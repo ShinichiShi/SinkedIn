@@ -11,7 +11,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from 'next/image';
 import { HTMLMotionProps } from "framer-motion";
-import { Camera, X, Image as ImageIcon } from "lucide-react";
+import { Camera, X, Image as ImageIcon, Send, Sparkles } from "lucide-react";
 
 export function CreatePost() {
   const [postContent, setPostContent] = useState("");
@@ -20,8 +20,11 @@ export function CreatePost() {
   const [errorMessage, setErrorMessage] = useState("");
   const [currentUserProfilePic, setCurrentUserProfilePic] = useState("");
   const [hovered, setHovered] = useState(false);
-  const [imagePreview, setImagePreview] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [charCount, setCharCount] = useState(0);
   const router = useRouter();
+
+  const maxChars = 280;
 
   const fetchCurrentUserProfile = useCallback(async () => {
     const currentUser = auth.currentUser;
@@ -83,7 +86,7 @@ export function CreatePost() {
         const postsRef = collection(db, "posts");
         await addDoc(postsRef, {
           content: postContent,
-          image: postImage, // New field for image
+          image: postImage,
           timestamp: serverTimestamp(),
           userName: currentUser.displayName || "Anonymous",
           userId: currentUser.uid,
@@ -97,7 +100,8 @@ export function CreatePost() {
         toast.success("Your voice shall be heard");
         setPostContent("");
         setPostImage("");
-        window.location.reload(); // Refresh to show new post
+        setCharCount(0);
+        window.location.reload();
       } else {
         toast.error("ooo nice...how informative");
       }
@@ -106,6 +110,15 @@ export function CreatePost() {
       setErrorMessage("An error occurred while posting.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value;
+    if (text.length <= maxChars) {
+      setPostContent(text);
+      setCharCount(text.length);
+      setErrorMessage("");
     }
   };
 
@@ -118,43 +131,28 @@ export function CreatePost() {
   };
 
   const containerVariants = {
-    initial: { 
+    rest: { 
       scale: 1,
-      y: 0,
-      rotateX: 0
+      y: 0
     },
     hover: { 
-      scale: 1.01,
-      y: -3,
-      rotateX: 1,
+      scale: 1.005,
+      y: -1,
       transition: {
         duration: 0.3,
-        ease: [0.25, 0.1, 0.25, 1]
+        ease: "easeOut"
       }
     }
   };
 
-  const glowVariants = {
-    initial: { opacity: 0, scale: 0.9 },
-    animate: { 
-      opacity: [0.3, 0.1, 0.3],
-      scale: [1, 1.05, 1],
-      transition: {
-        duration: 4,
-        repeat: Infinity,
-        ease: "easeInOut"
-      }
-    }
-  };
-
-  const buttonVariants = {
-    initial: { scale: 1 },
+  const borderVariants = {
+    rest: { 
+      opacity: 0.2
+    },
     hover: { 
-      scale: 1.05,
+      opacity: 0.4,
       transition: {
-        type: "spring",
-        stiffness: 400,
-        damping: 10
+        duration: 0.3
       }
     }
   };
@@ -162,75 +160,87 @@ export function CreatePost() {
   return (
     <motion.div
       variants={containerVariants}
-      initial="initial"
+      initial="rest"
       whileHover="hover"
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
-      className="relative mb-6 p-0.5 rounded-3xl group/card"
+      className="relative mb-6"
     >
-      {/* Animated background glow */}
-      <motion.div
-        className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-indigo-500/20 rounded-3xl blur-xl"
-        variants={glowVariants}
-        initial="initial"
-        animate="animate"
-      />
       
-      {/* Neon border effect */}
-      <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-cyan-400/30 via-blue-500/30 to-indigo-500/30 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500" />
-      
-      <div className="relative backdrop-blur-xl bg-slate-900/80 rounded-3xl p-4  border border-cyan-500/20 hover:border-cyan-400/40 transition-all duration-500">
-        <div className="relative z-10">
-          <div className="flex gap-5">
+      {/* Main container */}
+      <div className="relative bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/60 
+        hover:border-slate-600/70 transition-all duration-300 overflow-hidden">
+        
+        {/* Subtle top accent */}
+        <motion.div 
+          className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-500/30 to-transparent"
+          variants={borderVariants}
+          initial="rest"
+          animate={hovered ? "hover" : "rest"}
+        />
+        
+        <div className="p-4">
+          <div className="flex gap-3">
             {/* Profile Picture */}
             <motion.div   
-              whileHover={{ scale: 1.1, rotate: 2 }}
-              className="relative w-14 h-14 rounded-full overflow-hidden ring-2 ring-cyan-500/40 
-                hover:ring-cyan-400/60 transition-all duration-300 shadow-lg shadow-cyan-500/20"
+              whileHover={{ scale: 1.05 }}
+              transition={{ duration: 0.2 }}
+              className="relative w-12 h-12 rounded-xl overflow-hidden"
             >
               <Image
                 src={currentUserProfilePic}
                 alt="User's avatar"
-                width={56}
-                height={56}
+                width={48}
+                height={48}
                 className="w-full h-full object-cover"
-              />
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-tr from-cyan-500/20 to-blue-500/20"
-                initial={{ opacity: 0 }}
-                whileHover={{ opacity: 1 }}
               />
             </motion.div>
 
-            <div className="flex-1 space-y-5">
+            <div className="flex-1 space-y-3">
               {/* Text Area */}
-              <motion.textarea
-                whileFocus={{ scale: 1.005 }}
-                transition={{ duration: 0.2 }}
-                placeholder="Share your latest failure... We're here to support you! 💫"
-                value={postContent}
-                onChange={(e) => setPostContent(e.target.value)}
-                className="w-full min-h-[80px] p-2 rounded-2xl bg-slate-800/50 border border-cyan-500/20 
-                  focus:border-cyan-400/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 
-                  placeholder-slate-400/70 resize-none transition-all duration-300
-                  hover:bg-slate-800/70 hover:border-cyan-500/30 text-slate-100
-                  shadow-inner shadow-slate-900/20"
-                style={{
-                  fontSize: '16px',
-                  lineHeight: '1.6'
-                }}
-              />
+              <div className="relative">
+                <motion.textarea
+                  whileFocus={{ 
+                    borderColor: "rgba(148, 163, 184, 0.5)"
+                  }}
+                  placeholder="What's on your mind?"
+                  value={postContent}
+                  onChange={handleTextChange}
+                  onFocus={() => setFocused(true)}
+                  onBlur={() => setFocused(false)}
+                  className="w-full min-h-[90px] p-3 rounded-xl bg-slate-700/30 border border-slate-600/40 
+                    focus:outline-none focus:border-slate-400/60 placeholder-slate-400 resize-none 
+                    transition-all duration-200 text-slate-100 hover:bg-slate-700/40"
+                />
+                
+                {/* Character count */}
+                <AnimatePresence>
+                  {focused && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.9 }}
+                      className="absolute -bottom-1 right-2 px-2 py-1 bg-slate-800/90 
+                        border border-slate-600/40 rounded-lg text-xs"
+                    >
+                      <span className={charCount > maxChars * 0.8 ? "text-orange-400" : "text-slate-400"}>
+                        {maxChars - charCount}
+                      </span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
               {/* Image Preview */}
               <AnimatePresence>
                 {postImage && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
-                    className="relative rounded-2xl overflow-hidden border border-cyan-500/20 shadow-lg"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    className="relative rounded-xl overflow-hidden border border-slate-600/40"
                   >
-                    <div className="relative max-h-80 overflow-hidden">
+                    <div className="relative max-h-64 overflow-hidden">
                       <Image
                         src={postImage}
                         alt="Post attachment"
@@ -238,106 +248,88 @@ export function CreatePost() {
                         height={400}
                         className="w-full h-auto object-cover"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent" />
                     </div>
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       onClick={removeImage}
-                      className="absolute top-3 right-3 p-2 rounded-full bg-slate-900/80 hover:bg-red-500/80 
-                        text-white transition-all duration-200 backdrop-blur-sm"
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-900/80 hover:bg-red-500/80 
+                        text-white transition-colors duration-200 backdrop-blur-sm"
                     >
-                      <X size={16} />
+                      <X size={14} />
                     </motion.button>
                   </motion.div>
                 )}
               </AnimatePresence>
 
               {/* Action Bar */}
-              <motion.div 
-                className="flex justify-between items-center gap-4"
-                initial={{ opacity: 0.8 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.3 }}
-              >
-                {/* <div className="flex">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  {/* Image upload button */}
                   <motion.button
-                    variants={buttonVariants}
-                    whileHover="hover"
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => {
-                      // Trigger Cloudinary upload widget
-                      const widget = window.cloudinary?.createUploadWidget(
-                        {
-                          cloudName: 'your-cloud-name',
-                          uploadPreset: 'your-upload-preset',
-                          multiple: false,
-                          resourceType: 'image'
-                        },
-                        (error: any, result: any) => {
-                          if (!error && result && result.event === "success") {
-                            handleImageUpload(result.info.secure_url);
-                          }
-                        }
-                      );
-                      widget?.open();
-                    }}
-                    className="px-2 py-2 rounded-xl bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-indigo-500/10
-                      hover:from-cyan-500/20 hover:via-blue-500/20 hover:to-indigo-500/20 border border-cyan-500/20 
-                      hover:border-cyan-400/40 transition-all duration-300 text-sm flex items-center gap-2
-                      text-cyan-100 hover:text-cyan-50 shadow-lg shadow-cyan-500/10"
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-700/40 
+                      hover:bg-slate-600/50 border border-slate-600/40 hover:border-slate-500/60 
+                      transition-all duration-200 text-slate-300 hover:text-slate-200"
                   >
                     <Camera size={16} />
-                    Proof ?
+                    <span className="text-sm font-medium">Photo</span>
                   </motion.button>
-                 </div> */}
+
+                  {/* Subtle indicator */}
+                  {postContent.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      className="flex items-center gap-1 text-slate-400"
+                    >
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                      >
+                        <Sparkles size={12} />
+                      </motion.div>
+                      <span className="text-xs">Ready</span>
+                    </motion.div>
+                  )}
+                </div>
 
                 {/* Submit Button */}
                 <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
                   onClick={handlePostSubmit}
-                  disabled={loading}
-                  className="relative px-2 py-1 rounded-xl overflow-hidden
-                    disabled:opacity-50 font-semibold group/button shadow-lg"
+                  disabled={loading || !postContent.trim()}
+                  className="relative overflow-hidden rounded-lg px-4 py-2 
+                    disabled:opacity-50 disabled:cursor-not-allowed font-medium text-white
+                    bg-blue-600/80 hover:bg-blue-600 transition-all duration-200
+                    border border-blue-500/40 hover:border-blue-400/60"
                 >
-                  <motion.div 
-                    className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500"
-                    animate={{
-                      backgroundPosition: hovered ? ["0% 50%", "100% 50%", "0% 50%"] : "0% 50%",
-                    }}
-                    transition={{ duration: 2, ease: "easeInOut", repeat: hovered ? Infinity : 0 }}
-                  />
-                  <motion.div 
-                    className="relative z-10 flex items-center gap-2 text-white"
-                    animate={{
-                      y: loading ? [0, -1, 0] : 0
-                    }}
-                    transition={{ duration: 0.5, repeat: loading ? Infinity : 0 }}
-                  >
+                  <div className="flex items-center gap-1.5">
                     {loading ? (
                       <>
                         <motion.div
                           animate={{ rotate: 360 }}
                           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
+                          className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
                         />
-                        <span>Sharing...</span>
+                        <span className="text-sm">Posting...</span>
                       </>
                     ) : (
                       <>
-                        <span className="text-base">Confess</span>
+                        <motion.div
+                          animate={{ x: hovered ? [0, 2, 0] : 0 }}
+                          transition={{ duration: 0.6, repeat: hovered ? Infinity : 0 }}
+                        >
+                          <Send size={14} />
+                        </motion.div>
+                        <span className="text-sm">Post</span>
                       </>
                     )}
-                  </motion.div>
-                  
-                  {/* Button glow effect */}
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-cyan-400/50 via-blue-400/50 to-indigo-400/50 rounded-xl blur-xl opacity-0 group-hover/button:opacity-70 transition-opacity duration-300"
-                    style={{ zIndex: -1 }}
-                  />
+                  </div>
                 </motion.button>
-              </motion.div>
+              </div>
             </div>
           </div>
         </div>
@@ -347,17 +339,15 @@ export function CreatePost() {
       <AnimatePresence>
         {errorMessage && (
           <motion.div
-            initial={{ opacity: 0, y: -10, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -10, scale: 0.95 }}
-            className="mt-4"
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            className="mt-3"
           >
-            <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 p-4 rounded-xl backdrop-blur-sm">
+            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
               <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center">
-                  <div className="w-2 h-2 rounded-full bg-red-400" />
-                </div>
-                {errorMessage}
+                <div className="w-2 h-2 rounded-full bg-red-400" />
+                <span className="text-red-300 text-sm">{errorMessage}</span>
               </div>
             </div>
           </motion.div>
