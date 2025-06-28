@@ -20,7 +20,8 @@ import {
   updateDoc, 
   increment,
   arrayUnion,
-  arrayRemove 
+  arrayRemove,
+  where
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { motion } from "framer-motion";
@@ -70,6 +71,7 @@ export default function Feed(): ReactElement {
   const [loadingMore, setLoadingMore] = useState(false);
   const observerTarget = useRef<HTMLDivElement>(null);
   const [dislikedPosts, setDislikedPosts] = useState<string[]>([]);
+  const [cachedUsers, setCachedUsers] = useState<Map<string, any>>(new Map());
   const [commentBoxStates, setCommentBoxStates] = useState<{[key: string]: boolean}>({});
   const [commentInputs, setCommentInputs] = useState<{[key: string]: string}>({});
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -85,12 +87,58 @@ export default function Feed(): ReactElement {
       );
       const documentSnapshots = await getDocs(postsQuery);
       
-      const posts = documentSnapshots.docs.map(doc => ({
+      const postsData = documentSnapshots.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as Post[];
       
-      setPosts(posts);
+      // Get unique user IDs from posts that aren't already cached
+      const allUserIds = Array.from(new Set(postsData.map((post: Post) => post.userId)));
+      const uncachedUserIds = allUserIds.filter(userId => !cachedUsers.has(userId));
+      
+      console.log(`Total users needed: ${allUserIds.length}, Cached: ${allUserIds.length - uncachedUserIds.length}, New fetches: ${uncachedUserIds.length}`);
+      
+      let currentUserCache = new Map(cachedUsers);
+      
+      // Only fetch users that aren't in cache
+      if (uncachedUserIds.length > 0) {
+        // Firestore 'in' query has a limit of 10, so we need to batch if more than 10 users
+        const batches = [];
+        for (let i = 0; i < uncachedUserIds.length; i += 10) {
+          const batch = uncachedUserIds.slice(i, i + 10);
+          batches.push(batch);
+        }
+        
+        for (const batch of batches) {
+          const usersQuery = query(
+            collection(db, "users"),
+            where("__name__", "in", batch)
+          );
+          const usersSnapshot = await getDocs(usersQuery);
+          
+          usersSnapshot.docs.forEach(doc => {
+            currentUserCache.set(doc.id, doc.data());
+          });
+        }
+        
+        setCachedUsers(currentUserCache);
+      }
+      
+      // Combine posts with user profile pictures
+      const postsWithProfilePics: Post[] = postsData.map((post: Post) => {
+        const userData = currentUserCache.get(post.userId);
+        return {
+          ...post,
+          userProfilePic: userData?.profilepic || null,
+          userName: userData?.username || post.userName || "Anonymous"
+        };
+      });
+      
+      console.log("Fetched posts with profile pics:", postsWithProfilePics);
+      console.log("Total cached users:", currentUserCache.size);
+      console.log("Firestore reads for users:", uncachedUserIds.length);
+      
+      setPosts(postsWithProfilePics);
       setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length-1]);
       setHasMore(documentSnapshots.docs.length === 10);
     } catch (error) {
@@ -101,23 +149,73 @@ export default function Feed(): ReactElement {
 
   const loadMorePosts = useCallback(async () => {
     if (!lastVisible || loadingMore || !hasMore) return;
-
+    
     setLoadingMore(true);
-    try {      const postsQuery = query(
+    try {
+      const postsQuery = query(
         collection(db, "posts"),
         orderBy("timestamp", "desc"),
         startAfter(lastVisible),
         limit(10)
       );
-      
       const documentSnapshots = await getDocs(postsQuery);
       
-      const newPosts = documentSnapshots.docs.map(doc => ({
+      const newPostsData = documentSnapshots.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
-      }));
+      })) as Post[];
       
-      setPosts(prevPosts => [...prevPosts, ...newPosts]);
+      if (newPostsData.length === 0) {
+        setHasMore(false);
+        setLoadingMore(false);
+        return;
+      }
+      
+      // Get unique user IDs from new posts that aren't already cached
+      const allUserIds = Array.from(new Set(newPostsData.map((post: Post) => post.userId)));
+      const uncachedUserIds = allUserIds.filter(userId => !cachedUsers.has(userId));
+      
+      // console.log(`Load more - Total users needed: ${allUserIds.length}, Cached: ${allUserIds.length - uncachedUserIds.length}, New fetches: ${uncachedUserIds.length}`);
+      
+      let currentUserCache = new Map(cachedUsers);
+      
+      // Only fetch users that aren't in cache
+      if (uncachedUserIds.length > 0) {
+        const batches = [];
+        for (let i = 0; i < uncachedUserIds.length; i += 10) {
+          const batch = uncachedUserIds.slice(i, i + 10);
+          batches.push(batch);
+        }
+        
+        for (const batch of batches) {
+          const usersQuery = query(
+            collection(db, "users"),
+            where("__name__", "in", batch)
+          );
+          const usersSnapshot = await getDocs(usersQuery);
+          
+          usersSnapshot.docs.forEach(doc => {
+            currentUserCache.set(doc.id, doc.data());
+          });
+        }
+        
+        setCachedUsers(currentUserCache);
+      }
+      
+      // Combine new posts with user profile pictures using cache
+      const newPostsWithProfilePics: Post[] = newPostsData.map((post: Post) => {
+        const userData = currentUserCache.get(post.userId);
+        return {
+          ...post,
+          userProfilePic: userData?.profilepic || null,
+          userName: userData?.username || post.userName || "Anonymous"
+        };
+      });
+      
+      console.log("Loaded more posts with profile pics:", newPostsWithProfilePics);
+      console.log("Firestore reads for users in load more:", uncachedUserIds.length);
+      
+      setPosts(prevPosts => [...prevPosts, ...newPostsWithProfilePics]);
       setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length-1]);
       setHasMore(documentSnapshots.docs.length === 10);
     } catch (error) {
@@ -126,8 +224,7 @@ export default function Feed(): ReactElement {
     } finally {
       setLoadingMore(false);
     }
-  }, [lastVisible, loadingMore, hasMore]);
-
+  }, [lastVisible, loadingMore, hasMore, cachedUsers]);
 
   const handleDislike = async (postId: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -242,10 +339,21 @@ export default function Feed(): ReactElement {
       const postIndex = posts.findIndex((post) => post.id === postId);
       const post = posts[postIndex];
 
+      let userProfilePic = cachedUsers.get(currentUser.uid)?.profilepic;
+      if (!userProfilePic) {
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          userProfilePic = userData.profilepic;
+          setCachedUsers(prev => new Map(prev).set(currentUser.uid, userData));
+        }
+      }
+
       const newComment = {
         userId: currentUser.uid,
         userName: currentUser.displayName || "Anonymous",
         text: commentText,
+        profilePic: userProfilePic || null,
         timestamp: new Date().toISOString(),
       };
 
@@ -277,62 +385,66 @@ export default function Feed(): ReactElement {
     router.push(`/post/${postId}`);
   };
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(      entries => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore) {
-          loadMorePosts();
-        }
-      },
-      { 
-        threshold: 0.1,
-        rootMargin: '100px'
-      }
-    );
+  const fetchCommentProfilePics = async (comments: Comment[]) => {
+    const uncachedUserIds = comments
+      .filter(comment => !cachedUsers.has(comment.userId))
+      .map(comment => comment.userId);
 
-    if (observerTarget.current) {
-      observer.observe(observerTarget.current);
+    if (uncachedUserIds.length > 0) {
+      const batches = [];
+      for (let i = 0; i < uncachedUserIds.length; i += 10) {
+        batches.push(uncachedUserIds.slice(i, i + 10));
+      }
+
+      let currentUserCache = new Map(cachedUsers);
+      for (const batch of batches) {
+        const usersQuery = query(
+          collection(db, "users"),
+          where("__name__", "in", batch)
+        );
+        const usersSnapshot = await getDocs(usersQuery);
+        
+        usersSnapshot.docs.forEach(doc => {
+          currentUserCache.set(doc.id, doc.data());
+        });
+      }
+      setCachedUsers(currentUserCache);
+    }
+  };
+
+  const formatRelativeTime = (timestamp: any): string => {
+    if (!timestamp) return "";
+
+    const now = new Date();
+    const postDate = timestamp?.seconds
+      ? new Date(timestamp.seconds * 1000)
+      : new Date(timestamp);
+
+    if (!(postDate instanceof Date) || isNaN(postDate.getTime())) {
+      return "";
     }
 
-    return () => observer.disconnect();
-  }, [loadMorePosts, hasMore, loadingMore]);
+    const diffInMs = now.getTime() - postDate.getTime();
+    const diffInSeconds = Math.floor(diffInMs / 1000);
+    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
 
-  useEffect(() => {
-    try {
-      const auth = getAuth(firebaseApp);
-      const user = auth.currentUser;
-      if (!user) {
-        router.push("/login");
-        return;
-      } else {
-        fetchInitialPosts().finally(() => setLoading(false));
-      }
-    } catch (error: any) {
-      toast.error("Error fetching user data:", error);
+    if (diffInSeconds < 60) {
+      return "Just now";
+    } else if (diffInMinutes < 60) {
+      return `${diffInMinutes}m ago`;
+    } else if (diffInHours < 24) {
+      return `${diffInHours}h ago`;
+    } else if (diffInDays < 7) {
+      return `${diffInDays} day${diffInDays === 1 ? "" : "s"} ago`;
+    } else {
+      return postDate.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+      });
     }
-  }, [router]);
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const auth = getAuth(firebaseApp);
-        const user = auth.currentUser;
-        if (user) {
-          setCurrentUser(user);
-          const userDoc = await getDoc(doc(db, "users", user.uid));
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            setUserFollowing(userData.following || []);
-          }
-        } else {
-          router.push("/login");
-        }
-      } catch (error) {
-        console.error("Error fetching user data:", error);
-      }
-    };
-
-    fetchUserData();
-  }, [router]);
+  };
 
   const handleFollow = async (targetUserId: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -394,6 +506,78 @@ export default function Feed(): ReactElement {
     }
   };
 
+  // Move all useEffect hooks to the top level, not conditionally called
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          loadMorePosts();
+        }
+      },
+      { 
+        threshold: 0.1,
+        rootMargin: '100px'
+      }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [loadMorePosts, hasMore, loadingMore]);
+
+  useEffect(() => {
+    try {
+      const auth = getAuth(firebaseApp);
+      const user = auth.currentUser;
+      if (!user) {
+        router.push("/login");
+        return;
+      } else {
+        fetchInitialPosts().finally(() => setLoading(false));
+      }
+    } catch (error: any) {
+      toast.error("Error fetching user data:" + error.message);
+    }
+  }, [router]);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const auth = getAuth(firebaseApp);
+        const user = auth.currentUser;
+        if (user) {
+          setCurrentUser(user);
+          const userDoc = await getDoc(doc(db, "users", user.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setUserFollowing(userData.following || []);
+          }
+        } else {
+          router.push("/login");
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error);
+      }
+    };
+
+    fetchUserData();
+  }, [router]);
+
+  useEffect(() => {
+    const fetchAllCommentProfilePics = async () => {
+      const allComments = posts.flatMap(post => post.comments || []);
+      if (allComments.length > 0) {
+        await fetchCommentProfilePics(allComments);
+      }
+    };
+
+    if (posts.length > 0) {
+      fetchAllCommentProfilePics();
+    }
+  }, [posts]);
+
   if (loading) return (
     <div className="flex h-screen items-center justify-center">
       <div><Loader loading={true} size={50} color="white" /></div>
@@ -409,34 +593,63 @@ export default function Feed(): ReactElement {
       <main className="flex-1 h-screen overflow-y-auto max-h-[calc(100vh-120px)] max-w-2xl md:mx-[28%] no-scrollbar">
         <CreatePost />
         
-        {posts.map((post) => (          <div
+        {posts.map((post) => (          
+          <div
             key={post.id}
             onClick={() => handlePostClick(post.id)}
-            className="bg-white dark:bg-card/80 text-card-foreground rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-8 space-y-6 mb-6 cursor-pointer border-2 border-gray-200 dark:border-white/20 hover:border-gray-300 dark:hover:border-white/40 backdrop-filter backdrop-blur-sm hover:bg-gray-50 dark:hover:bg-accent/5"
+            className="bg-white dark:bg-card/80 text-card-foreground rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-4 space-y-6 mb-4 cursor-pointer border-2 border-gray-200 dark:border-white/20 hover:border-gray-300 dark:hover:border-white/40 backdrop-filter backdrop-blur-sm hover:bg-gray-50 dark:hover:bg-accent/5"
           >
             <div className="flex items-center space-x-4">
-              <div className="w-14 h-14 rounded-full overflow-hidden relative ring-2 ring-primary/20 ring-offset-2 ring-offset-background transition-all duration-300 hover:ring-primary/40">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={post.userProfilePic || "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"}
-                  alt={`${post.userName}'s avatar`}
-                  className="w-full h-full object-cover"
-                />
-              </div>              <div className="flex-1">
-                <div className="flex justify-between items-start">                  <div>
-                    <h3 className="font-semibold text-lg text-foreground hover:text-primary transition-colors duration-200">{post.userName || "Anonymous"}</h3>
+              <div className="w-10 h-10 rounded-full overflow-hidden relative ring-2 ring-primary/20 ring-offset-2 ring-offset-background transition-all duration-300 hover:ring-primary/40">
+                <Image
+                    src={post.userProfilePic || "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"}
+                    alt={`${post.userName}'s avatar`}
+                    width={48}
+                    height={48}
+                    className="w-full h-full object-cover"
+                  />
+              </div>              
+              <div className="flex-1">
+                <div className="flex justify-between items-start">                  
+                  <div>
+                    <h3 className="font-semibold text-base text-foreground hover:text-primary transition-colors duration-200">{post.userName || "Anonymous"}</h3>
                     <p className="text-sm text-muted-foreground/80">
-                      {post.timestamp?.seconds ? new Date(post.timestamp.seconds * 1000).toLocaleString() : 
-                      post.createdAt ? new Date(post.createdAt).toLocaleString() : ""}
+                      {formatRelativeTime(post.timestamp || post.createdAt)}
                     </p>
                   </div>
                 </div>
               </div>
+              {currentUser && post.userId !== currentUser.uid && (
+                userFollowing.includes(post.userId) ? (
+                  <MotionButton
+                    whileTap={{ scale: 0.95 }}
+                    onClick={(e) => handleUnfollow(post.userId, e)}
+                    className="flex items-center space-x-2 rounded-full px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 transition-all duration-200"
+                  >
+                    <div><UserMinus className="h-5 w-5" /></div>
+                    <span>Unfollow</span>
+                  </MotionButton>
+                ) : (
+                  <MotionButton
+                    whileTap={{ scale: 0.95 }}
+                    onClick={(e) => handleFollow(post.userId, e)}
+                    className="flex items-center space-x-2 rounded-full px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 transition-all duration-200"
+                  >
+                    <div><UserPlus className="h-5 w-5" /></div>
+                    <span>Follow</span>
+                  </MotionButton>
+                )
+              )}
             </div>
-              <div className="text-base text-gray-800 dark:text-foreground/90 leading-relaxed whitespace-pre-wrap px-4 py-2 rounded-lg bg-gray-50 dark:bg-accent/5">
+              
+            <div className="text-base text-gray-800 dark:text-foreground/90 leading-relaxed whitespace-pre-wrap rounded-lg bg-gray-50 dark:bg-accent/5">
               {post.content}
             </div>
-              <div className="flex justify-around pt-6 mt-2 border-t border-gray-200 dark:border-border/30">
+              
+            <div className="flex justify-between border-gray-200 dark:border-border/30">
+            <div className="flex items-center">
+
+           
               <MotionButton
                 whileTap={{ scale: 0.95 }}
                 onClick={(e) => handleDislike(post.id, e)}
@@ -463,6 +676,7 @@ export default function Feed(): ReactElement {
                 <span>{post.comments?.length || 0}</span>
               </MotionButton>
 
+              </div>
               <MotionButton
                 whileTap={{ scale: 0.95 }}
                 onClick={(e) => handleShare(post.id, e)}
@@ -470,33 +684,11 @@ export default function Feed(): ReactElement {
               >
                 <div><Link2 className="h-5 w-5" /></div>
                 <span>{post.shares || 0}</span>
-              </MotionButton>
-
-              {currentUser && post.userId !== currentUser.uid && (
-                userFollowing.includes(post.userId) ? (
-                  <MotionButton
-                    whileTap={{ scale: 0.95 }}
-                    onClick={(e) => handleUnfollow(post.userId, e)}
-                    className="flex items-center space-x-2 rounded-full px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 transition-all duration-200"
-                  >
-                    <div><UserMinus className="h-5 w-5" /></div>
-                    <span>Unfollow</span>
-                  </MotionButton>
-                ) : (
-                  <MotionButton
-                    whileTap={{ scale: 0.95 }}
-                    onClick={(e) => handleFollow(post.userId, e)}
-                    className="flex items-center space-x-2 rounded-full px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 transition-all duration-200"
-                  >
-                    <div><UserPlus className="h-5 w-5" /></div>
-                    <span>Follow</span>
-                  </MotionButton>
-                )
-              )}
+              </MotionButton>              
             </div>
 
             {commentBoxStates[post.id] && (
-              <div className="mt-4 space-y-4" onClick={(e) => e.stopPropagation()}>
+              <div onClick={(e) => e.stopPropagation()}>
                 <div className="flex space-x-2">
                   <textarea
                     value={commentInputs[post.id] || ""}
@@ -505,11 +697,11 @@ export default function Feed(): ReactElement {
                       [post.id]: e.target.value
                     }))}
                     placeholder="Write a comment..."
-                    className="flex-1 min-h-[40px] p-3 rounded-xl border border-gray-200 dark:border-border bg-white dark:bg-background/50 backdrop-blur-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all duration-200"
+                    className="flex-1 px-1 rounded-xl placeholder:p-2 border border-gray-200 dark:border-border bg-white dark:bg-background/50 backdrop-blur-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all duration-200"
                   />
                   <button
                     onClick={(e) => handlePostComment(post.id, e)}
-                    className="px-4 py-2 bg-primary/90 text-primary-foreground rounded-xl hover:bg-primary transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 bg-primary/90 text-primary-foreground rounded-xl hover:bg-primary transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={!commentInputs[post.id]?.trim()}
                   >
                     Post
@@ -519,30 +711,34 @@ export default function Feed(): ReactElement {
                 {post.comments && post.comments.length > 0 && (
                   <div className="space-y-3 mt-4">
                     {post.comments.map((comment: Comment, index: number) => (
-                      <div key={index} className="flex items-start space-x-3 p-4 rounded-xl bg-gray-50 dark:bg-accent/30 backdrop-blur-sm hover:bg-gray-100 dark:hover:bg-accent/40 transition-all duration-200">
+                      <div key={index} className="flex items-start space-x-3 p-2 rounded-xl bg-gray-50 dark:bg-accent/30 backdrop-blur-sm hover:bg-gray-100 dark:hover:bg-accent/40 transition-all duration-200">
                         <div className="w-8 h-8 rounded-full overflow-hidden shadow-sm">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={comment.profilePic || "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"}
+                          <Image
+                            src={cachedUsers.get(comment.userId)?.profilepic || comment.profilePic || "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"}
                             alt="Commenter avatar"
+                            width={32}
+                            height={32}
                             className="w-full h-full object-cover"
                           />
                         </div>
                         <div className="flex-1">
-                          <p className="font-medium text-foreground">{comment.userName || "Anonymous"}</p>
+                          <div className="flex gap-3 items-center">
+                            <p className="font-medium text-sm">{comment.userName || "Anonymous"}</p>
+                            <p className="text-xs text-muted-foreground">
+                            {formatRelativeTime(comment.timestamp)}
+                             </p>
+                          </div>
                           <p className="text-sm text-foreground/90 mt-1">{comment.text}</p>
-                          <p className="text-xs text-muted-foreground mt-2">
-                            {new Date(comment.timestamp).toLocaleString()}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                          
+                </div>
               </div>
-            )}
+            ))} 
           </div>
-        ))}
+        )}
+      </div>
+    )}
+  </div>
+))}
 
         {loadingMore && (
           <div className="flex justify-center my-4">

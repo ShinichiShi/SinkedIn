@@ -35,6 +35,9 @@ interface Post {
   content: string;
   userId: string;
   timestamp: any;
+  dislikes?: number;
+  comments?: any[];
+  shares?: number;
 }
 
 export default function Profile() {
@@ -239,7 +242,23 @@ export default function Profile() {
       }
 
       const userDoc = doc(db, "users", user.uid);
-      await updateDoc(userDoc, edit);
+      
+      // Create update data with explicit typing for Firestore
+      const updateData: { [key: string]: any } = {
+        username: edit.username,
+        email: edit.email,
+        location: edit.location || "",
+        bio: edit.bio || "",
+        profilepic: edit.profilepic || "",
+        backgroundImage: edit.backgroundImage || "",
+        failedExperience: edit.failedExperience || [],
+        misEducation: edit.misEducation || [],
+        failureHighlights: edit.failureHighlights || [],
+        followers: edit.followers || [],
+        following: edit.following || []
+      };
+
+      await updateDoc(userDoc, updateData);
 
       setUserData(prev => ({
         ...prev!,
@@ -331,7 +350,18 @@ export default function Profile() {
                 </div>
               </div>
             </div>
-          </div>          <div className="mb-4 ml-auto mr-8 flex gap-2">
+          </div>
+          
+          <div className="mb-4 ml-auto mr-8 flex gap-2">
+            <Button
+              onClick={handleOpenModal}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Button>
             <CloudinaryUploadWidget
               onUploadSuccess={(url) => handleImageUpload(url, 'profile')}
               variant="profile"
@@ -346,7 +376,7 @@ export default function Profile() {
               size="sm"
               className="gap-2"
             >
-              <span className="inline-block w-4 h-4">🚪</span>
+              <LogOut className="h-4 w-4" />
               Logout
             </Button>
           </div>
@@ -479,7 +509,8 @@ export default function Profile() {
                 </button>
               </div>
               
-              <div className="space-y-6">                <div>
+              <div className="space-y-6">
+                <div>
                   <label className="block text-sm font-medium mb-2">Background Image</label>
                   {edit.backgroundImage ? (
                     <div className="relative h-32 w-full rounded-lg border-2 border-dashed border-border/50 overflow-hidden group">

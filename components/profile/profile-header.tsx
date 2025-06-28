@@ -17,7 +17,7 @@ export function ProfileHeader() {
               <p className="text-muted-foreground">Professional Dream Chaser | Serial Job Rejectee</p>
               <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
                 <MapPin className="h-4 w-4" />
-                <span>Parents' Basement, Somewhere</span>
+                <span>Parents&apos; Basement, Somewhere</span>
               </div>
             </div>
             <Button variant="outline" size="sm">

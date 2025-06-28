@@ -2,13 +2,14 @@
 
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { doc, getDoc, updateDoc, increment } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { Avatar } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import Image from "next/image";
 import { HashLoader } from "react-spinners";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "react-toastify";
 import { motion } from "framer-motion";
@@ -16,13 +17,73 @@ import { MessageCircle, ThumbsDown, Link2 } from "lucide-react";
 import { LeftSidebar } from "@/components/sidebar/leftsidebar";
 import { RightSidebar } from "@/components/sidebar/rightsidebar";
 
+// TypeScript interfaces
+interface Comment {
+  userId: string;
+  text: string;
+  userName: string;
+  profilePic: string;
+  timestamp: any; // Firebase Timestamp or Date
+}
+
+interface Post {
+  id: string;
+  userId: string;
+  content: string;
+  userName?: string;
+  userProfilePic?: string;
+  timestamp?: any; // Firebase Timestamp
+  dislikes?: number;
+  dislikedBy?: string[];
+  shares?: number;
+  comments?: Comment[];
+}
+
+interface UserData {
+  username: string;
+  profilepic: string;
+}
+
 const PostPage = () => {
   const { id } = useParams();
   const router = useRouter();
-  const [post, setPost] = useState<any>(null);
+  const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
   const [dislikedPosts, setDislikedPosts] = useState<string[]>([]);
   const [commentInput, setCommentInput] = useState<string>("");
+  const [cachedUsers, setCachedUsers] = useState<Map<string, UserData>>(new Map());
+
+  // Function to fetch user data and cache it
+  const fetchUserData = async (userIds: string[]) => {
+    const uncachedUserIds = userIds.filter(userId => !cachedUsers.has(userId));
+    
+    if (uncachedUserIds.length === 0) return;
+
+    let currentUserCache = new Map(cachedUsers);
+    
+    // Firestore 'in' query has a limit of 10, so we need to batch if more than 10 users
+    const batches = [];
+    for (let i = 0; i < uncachedUserIds.length; i += 10) {
+      const batch = uncachedUserIds.slice(i, i + 10);
+      batches.push(batch);
+    }
+    
+    for (const batch of batches) {
+      const usersQuery = query(
+        collection(db, "users"),
+        where("__name__", "in", batch)
+      );
+      const usersSnapshot = await getDocs(usersQuery);
+      
+      usersSnapshot.docs.forEach(doc => {
+        const userData = doc.data() as UserData;
+        currentUserCache.set(doc.id, userData);
+      });
+    }
+    
+    setCachedUsers(currentUserCache);
+    return currentUserCache;
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -34,7 +95,43 @@ const PostPage = () => {
         const postDoc = await getDoc(postRef);
 
         if (postDoc.exists()) {
-          setPost({ id: postDoc.id, ...postDoc.data() });
+          const postData = { id: postDoc.id, ...postDoc.data() } as Post;
+          
+          // Collect all user IDs that need profile data
+          const userIds = [postData.userId];
+          if (postData.comments) {
+            postData.comments.forEach((comment: Comment) => {
+              if (comment.userId && !userIds.includes(comment.userId)) {
+                userIds.push(comment.userId);
+              }
+            });
+          }
+
+          // Fetch user data for all users
+          const userCache = await fetchUserData(userIds);
+          const finalUserCache = userCache || cachedUsers;
+
+          // Update post with profile picture
+          const userData = finalUserCache.get(postData.userId);
+          const updatedPost: Post = {
+            ...postData,
+            userProfilePic: userData?.profilepic || "",
+            userName: userData?.username || postData.userName || "Anonymous",
+          };
+
+          // Update comments with profile pictures
+          if (updatedPost.comments) {
+            updatedPost.comments = updatedPost.comments.map((comment: Comment) => {
+              const commentUserData = finalUserCache.get(comment.userId);
+              return {
+                ...comment,
+                profilePic: commentUserData?.profilepic || "",
+                userName: commentUserData?.username || comment.userName || "Anonymous",
+              };
+            });
+          }
+
+          setPost(updatedPost);
         } else {
           console.error("Post not found");
           router.push("/404");
@@ -48,16 +145,92 @@ const PostPage = () => {
 
     fetchPost();
   }, [id, router]);
-  const handleDislike = (post:any)=>{
-    console.log("nai kiya define")
-  }
-  const handleShare = (post:any)=>{
-    console.log("nai kiya define")
-  }
-  const toggleCommentBox = (post:any)=>{
-    console.log("nai kiya define")
-  }
+
+  const handleDislike = async (postId: string) => {
+    if (!post) return;
+
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        toast.error("You need to be logged in to dislike a post.");
+        return;
+      }
+
+      const postRef = doc(db, "posts", postId);
+      const userId = currentUser.uid;
+      const hasDisliked = post.dislikedBy?.includes(userId);
+
+      if (hasDisliked) {
+        const updatedDislikedBy = post.dislikedBy?.filter((id: string) => id !== userId) || [];
+        await updateDoc(postRef, {
+          dislikes: Math.max((post.dislikes || 0) - 1, 0),
+          dislikedBy: updatedDislikedBy,
+        });
+
+        setPost((prev: Post | null) => prev ? ({
+          ...prev,
+          dislikes: Math.max((prev.dislikes || 0) - 1, 0),
+          dislikedBy: updatedDislikedBy,
+        }) : null);
+        setDislikedPosts(dislikedPosts.filter((id) => id !== postId));
+      } else {
+        const updatedDislikedBy = [...(post.dislikedBy || []), userId];
+        await updateDoc(postRef, {
+          dislikes: (post.dislikes || 0) + 1,
+          dislikedBy: updatedDislikedBy,
+        });
+
+        setPost((prev: Post | null) => prev ? ({
+          ...prev,
+          dislikes: (prev.dislikes || 0) + 1,
+          dislikedBy: updatedDislikedBy,
+        }) : null);
+        setDislikedPosts([...dislikedPosts, postId]);
+      }
+    } catch (error) {
+      console.error("Error updating dislikes:", error);
+      toast.error("Failed to update dislike.");
+    }
+  };
+
+  const handleShare = async (postId: string) => {
+    if (!post) return;
+
+    try {
+      const postRef = doc(db, "posts", postId);
+      await updateDoc(postRef, {
+        shares: (post.shares || 0) + 1,
+      });
+
+      setPost((prev: Post | null) => prev ? ({
+        ...prev,
+        shares: (prev.shares || 0) + 1,
+      }) : null);
+
+      const shareUrl = `${window.location.origin}/post/${postId}`;
+      if (navigator.share) {
+        await navigator.share({
+          title: "Check out this post!",
+          url: shareUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Post link copied to clipboard!");
+      }
+    } catch (error) {
+      console.error("Error sharing post:", error);
+      toast.error("Failed to share post.");
+    }
+  };
+
+  const toggleCommentBox = (postId: string) => {
+    // This function can be used to toggle comment visibility if needed
+    console.log("Toggle comment box for post:", postId);
+  };
+
   const handlePostComment = async () => {
+    if (!post) return;
+
     const currentUser = auth.currentUser;
 
     if (!currentUser) {
@@ -72,11 +245,34 @@ const PostPage = () => {
 
     try {
       const postRef = doc(db, "posts", post.id);
-      const newComment = {
+      
+      // Get current user data for the comment
+      const currentUserData = cachedUsers.get(currentUser.uid);
+      let userName = currentUser.displayName || "Anonymous";
+      let profilePic = "";
+
+      // If user data is cached, use it; otherwise fetch it
+      if (currentUserData) {
+        userName = currentUserData.username || userName;
+        profilePic = currentUserData.profilepic || "";
+      } else {
+        // Fetch current user data if not in cache
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data() as UserData;
+          userName = userData.username || userName;
+          profilePic = userData.profilepic || "";
+          
+          // Add to cache
+          setCachedUsers(prev => new Map(prev).set(currentUser.uid, userData));
+        }
+      }
+
+      const newComment: Comment = {
         userId: currentUser.uid,
         text: commentInput,
-        userName: currentUser.displayName || "Anonymous",
-        profilePic: currentUser.photoURL || "",
+        userName: userName,
+        profilePic: profilePic,
         timestamp: new Date(),
       };
 
@@ -88,10 +284,10 @@ const PostPage = () => {
         comments: updatedComments,
       });
 
-      setPost((prev:any) => ({
+      setPost((prev: Post | null) => prev ? ({
         ...prev,
         comments: updatedComments,
-      }));
+      }) : null);
       setCommentInput("");
       toast.success("Comment added!");
     } catch (error) {
@@ -118,6 +314,7 @@ const PostPage = () => {
       <div className="w-full max-w-2xl mx-auto">
         <Card className="p-4 mb-4">
           <div className="flex gap-4">
+            <Link href={`/profile/${post.userId}`}>
             <Avatar className="w-12 h-12">
               <Image
                 src={
@@ -139,6 +336,7 @@ const PostPage = () => {
               </p>
               <p className="mt-2">{post.content}</p>
             </div>
+            </Link>
           </div>
           <hr className="my-4 border-secondary" /> 
           <div className="flex justify-around text-sm text-gray-500">
@@ -156,7 +354,7 @@ const PostPage = () => {
                       : "text-muted-foreground"
                   }`}
                 />
-                {post.dislikes} Dislike
+                {post.dislikes || 0} Dislike
               </Button>
             </motion.div>
 
@@ -185,7 +383,7 @@ const PostPage = () => {
           <h3 className="text-lg font-semibold mb-2">Comments</h3>
           {post.comments && post.comments.length > 0 ? (
             <div className="space-y-4">
-              {post.comments.map((comment: any, index: number) => (
+              {post.comments.map((comment: Comment, index: number) => (
                 <div key={index} className="flex gap-4">
                   <Avatar className="w-10 h-10">
                     <Image
@@ -202,7 +400,11 @@ const PostPage = () => {
                   <div>
                     <p className="font-bold">{comment.userName || "Anonymous"}</p>
                     <p className="text-sm text-gray-600">
-                      {new Date(comment.timestamp).toLocaleString()}
+                      {comment.timestamp && comment.timestamp.seconds 
+                        ? new Date(comment.timestamp.seconds * 1000).toLocaleString()
+                        : comment.timestamp 
+                        ? new Date(comment.timestamp).toLocaleString()
+                        : "No timestamp"}
                     </p>
                     <p className="mt-1">{comment.text}</p>
                   </div>
