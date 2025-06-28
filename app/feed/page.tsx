@@ -585,7 +585,7 @@ export default function Feed(): ReactElement {
   );
 
   return (
-    <div className="container max-h-screen mx-auto px-4 py-8">
+    <div className="container max-h-screen mx-auto px-4 py-8 -mt-7">
       <aside className="lg:block">
         <div><LeftSidebar /></div>
       </aside>

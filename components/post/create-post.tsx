@@ -169,7 +169,7 @@ export function CreatePost() {
       
       {/* Main container */}
       <div className="relative bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/60 
-        hover:border-slate-600/70 transition-all duration-300 overflow-hidden">
+        hover:border-slate-600/70 transition-all duration-300 overflow-hidden ">
         
         {/* Subtle top accent */}
         <motion.div 
