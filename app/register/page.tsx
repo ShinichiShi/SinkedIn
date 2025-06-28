@@ -18,6 +18,7 @@ import { firebaseApp } from "@/lib/firebase";
 import { useAuth } from "@/contexts/AuthContext";
 import { doc, setDoc } from "firebase/firestore";
 import { toast } from "react-toastify";
+import { db } from "@/lib/firebase";
 
 interface UserData {
   username: string;

@@ -11,13 +11,16 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from 'next/image';
 import { HTMLMotionProps } from "framer-motion";
+import { Camera, X, Image as ImageIcon } from "lucide-react";
 
 export function CreatePost() {
   const [postContent, setPostContent] = useState("");
+  const [postImage, setPostImage] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [currentUserProfilePic, setCurrentUserProfilePic] = useState("");
   const [hovered, setHovered] = useState(false);
+  const [imagePreview, setImagePreview] = useState(false);
   const router = useRouter();
 
   const fetchCurrentUserProfile = useCallback(async () => {
@@ -80,6 +83,7 @@ export function CreatePost() {
         const postsRef = collection(db, "posts");
         await addDoc(postsRef, {
           content: postContent,
+          image: postImage, // New field for image
           timestamp: serverTimestamp(),
           userName: currentUser.displayName || "Anonymous",
           userId: currentUser.uid,
@@ -92,6 +96,7 @@ export function CreatePost() {
 
         toast.success("Your voice shall be heard");
         setPostContent("");
+        setPostImage("");
         window.location.reload(); // Refresh to show new post
       } else {
         toast.error("ooo nice...how informative");
@@ -104,6 +109,14 @@ export function CreatePost() {
     }
   };
 
+  const handleImageUpload = (url: string) => {
+    setPostImage(url);
+  };
+
+  const removeImage = () => {
+    setPostImage("");
+  };
+
   const containerVariants = {
     initial: { 
       scale: 1,
@@ -111,23 +124,23 @@ export function CreatePost() {
       rotateX: 0
     },
     hover: { 
-      scale: 1.02,
-      y: -5,
-      rotateX: 2,
+      scale: 1.01,
+      y: -3,
+      rotateX: 1,
       transition: {
-        duration: 0.4,
+        duration: 0.3,
         ease: [0.25, 0.1, 0.25, 1]
       }
     }
   };
 
   const glowVariants = {
-    initial: { opacity: 0, scale: 0.8 },
+    initial: { opacity: 0, scale: 0.9 },
     animate: { 
-      opacity: [0.4, 0.2, 0.4],
-      scale: [1, 1.1, 1],
+      opacity: [0.3, 0.1, 0.3],
+      scale: [1, 1.05, 1],
       transition: {
-        duration: 3,
+        duration: 4,
         repeat: Infinity,
         ease: "easeInOut"
       }
@@ -153,139 +166,199 @@ export function CreatePost() {
       whileHover="hover"
       onHoverStart={() => setHovered(true)}
       onHoverEnd={() => setHovered(false)}
-      className="relative mb-5 p-0.5 rounded-2xl group/card"
+      className="relative mb-6 p-0.5 rounded-3xl group/card"
     >
+      {/* Animated background glow */}
       <motion.div
-        className="absolute inset-0 bg-gradient-to-r from-purple-500/30 via-pink-500/30 to-orange-500/30 rounded-2xl blur-xl"
+        className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 via-blue-500/20 to-indigo-500/20 rounded-3xl blur-xl"
         variants={glowVariants}
         initial="initial"
         animate="animate"
       />
-      <div className="relative backdrop-blur-xl bg-black/20 rounded-2xl p-6 border border-white/10">
+      
+      {/* Neon border effect */}
+      <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-cyan-400/30 via-blue-500/30 to-indigo-500/30 opacity-0 group-hover/card:opacity-100 transition-opacity duration-500" />
+      
+      <div className="relative backdrop-blur-xl bg-slate-900/80 rounded-3xl p-4  border border-cyan-500/20 hover:border-cyan-400/40 transition-all duration-500">
         <div className="relative z-10">
-          <div className="flex gap-4">
-            <motion.div 
-              whileHover={{ scale: 1.1 }}
-              className="relative w-12 h-12 rounded-full overflow-hidden ring-2 ring-purple-500/30 
-                hover:ring-pink-500/50 transition-all duration-300"
+          <div className="flex gap-5">
+            {/* Profile Picture */}
+            <motion.div   
+              whileHover={{ scale: 1.1, rotate: 2 }}
+              className="relative w-14 h-14 rounded-full overflow-hidden ring-2 ring-cyan-500/40 
+                hover:ring-cyan-400/60 transition-all duration-300 shadow-lg shadow-cyan-500/20"
             >
               <Image
                 src={currentUserProfilePic}
                 alt="User's avatar"
-                width={48}
-                height={48}
-                className="object-cover"
+                width={56}
+                height={56}
+                className="w-full h-full object-cover"
               />
               <motion.div
-                className="absolute inset-0 bg-gradient-to-tr from-purple-500/20 to-pink-500/20"
+                className="absolute inset-0 bg-gradient-to-tr from-cyan-500/20 to-blue-500/20"
                 initial={{ opacity: 0 }}
                 whileHover={{ opacity: 1 }}
               />
             </motion.div>
-            <div className="flex-1 space-y-4">
+
+            <div className="flex-1 space-y-5">
+              {/* Text Area */}
               <motion.textarea
                 whileFocus={{ scale: 1.005 }}
                 transition={{ duration: 0.2 }}
-                placeholder="Share your latest failure... We're here to support you!"
+                placeholder="Share your latest failure... We're here to support you! 💫"
                 value={postContent}
                 onChange={(e) => setPostContent(e.target.value)}
-                className="w-full min-h-[120px] p-4 rounded-xl bg-white/5 border border-white/10 
-                  focus:border-purple-500/50 focus:outline-none focus:ring-2 focus:ring-purple-500/20 
-                  placeholder-gray-400/60 resize-none transition-all duration-300
-                  hover:bg-white/[0.07] hover:border-white/20"
+                className="w-full min-h-[80px] p-2 rounded-2xl bg-slate-800/50 border border-cyan-500/20 
+                  focus:border-cyan-400/50 focus:outline-none focus:ring-2 focus:ring-cyan-500/30 
+                  placeholder-slate-400/70 resize-none transition-all duration-300
+                  hover:bg-slate-800/70 hover:border-cyan-500/30 text-slate-100
+                  shadow-inner shadow-slate-900/20"
+                style={{
+                  fontSize: '16px',
+                  lineHeight: '1.6'
+                }}
               />
+
+              {/* Image Preview */}
+              <AnimatePresence>
+                {postImage && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.9, y: 10 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.9, y: -10 }}
+                    className="relative rounded-2xl overflow-hidden border border-cyan-500/20 shadow-lg"
+                  >
+                    <div className="relative max-h-80 overflow-hidden">
+                      <Image
+                        src={postImage}
+                        alt="Post attachment"
+                        width={600}
+                        height={400}
+                        className="w-full h-auto object-cover"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent" />
+                    </div>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      onClick={removeImage}
+                      className="absolute top-3 right-3 p-2 rounded-full bg-slate-900/80 hover:bg-red-500/80 
+                        text-white transition-all duration-200 backdrop-blur-sm"
+                    >
+                      <X size={16} />
+                    </motion.button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Action Bar */}
               <motion.div 
                 className="flex justify-between items-center gap-4"
                 initial={{ opacity: 0.8 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.3 }}
               >
-                <div className="flex gap-2">
+                {/* <div className="flex">
                   <motion.button
                     variants={buttonVariants}
                     whileHover="hover"
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10
-                      hover:from-purple-500/20 hover:to-pink-500/20 border border-white/10 
-                      transition-all duration-300 text-sm flex items-center gap-2"
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => {
+                      // Trigger Cloudinary upload widget
+                      const widget = window.cloudinary?.createUploadWidget(
+                        {
+                          cloudName: 'your-cloud-name',
+                          uploadPreset: 'your-upload-preset',
+                          multiple: false,
+                          resourceType: 'image'
+                        },
+                        (error: any, result: any) => {
+                          if (!error && result && result.event === "success") {
+                            handleImageUpload(result.info.secure_url);
+                          }
+                        }
+                      );
+                      widget?.open();
+                    }}
+                    className="px-2 py-2 rounded-xl bg-gradient-to-r from-cyan-500/10 via-blue-500/10 to-indigo-500/10
+                      hover:from-cyan-500/20 hover:via-blue-500/20 hover:to-indigo-500/20 border border-cyan-500/20 
+                      hover:border-cyan-400/40 transition-all duration-300 text-sm flex items-center gap-2
+                      text-cyan-100 hover:text-cyan-50 shadow-lg shadow-cyan-500/10"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21.2 15c.7-1.2 1-2.5.7-3.9-.6-2-2.4-3.5-4.4-3.5h-1.2c-.7-3-3.2-5.2-6.2-5.6-3-.3-5.9 1.3-7.3 4-1.2 2.5-1 5.5.5 7.9 1.4 2.2 3.9 3.6 6.7 3.6h8.5c.9 0 1.7-.2 2.4-.5"/>
-                      <path d="M15 9l-6 6"/>
-                      <path d="M9 9l6 6"/>
-                    </svg>
-                    Add Proof
+                    <Camera size={16} />
+                    Proof ?
                   </motion.button>
-                  <motion.button
-                    variants={buttonVariants}
-                    whileHover="hover"
-                    className="px-4 py-2 rounded-xl bg-gradient-to-r from-purple-500/10 to-pink-500/10
-                      hover:from-purple-500/20 hover:to-pink-500/20 border border-white/10 
-                      transition-all duration-300 text-sm flex items-center gap-2"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                    </svg>
-                    Rejection Letter
-                  </motion.button>
-                </div>
+                 </div> */}
+
+                {/* Submit Button */}
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={handlePostSubmit}
                   disabled={loading}
-                  className="relative px-6 py-2.5 rounded-xl overflow-hidden
-                    disabled:opacity-50 font-medium group/button"
+                  className="relative px-2 py-1 rounded-xl overflow-hidden
+                    disabled:opacity-50 font-semibold group/button shadow-lg"
                 >
                   <motion.div 
-                    className="absolute inset-0 bg-gradient-to-r from-purple-500 to-pink-500"
+                    className="absolute inset-0 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500"
                     animate={{
-                      backgroundPosition: hovered ? ["0% 50%", "100% 50%"] : "0% 50%",
+                      backgroundPosition: hovered ? ["0% 50%", "100% 50%", "0% 50%"] : "0% 50%",
                     }}
-                    transition={{ duration: 0.8, ease: "easeInOut" }}
+                    transition={{ duration: 2, ease: "easeInOut", repeat: hovered ? Infinity : 0 }}
                   />
                   <motion.div 
-                    className="relative z-10 flex items-center gap-2"
+                    className="relative z-10 flex items-center gap-2 text-white"
                     animate={{
-                      y: loading ? [0, -2, 0] : 0
+                      y: loading ? [0, -1, 0] : 0
                     }}
-                    transition={{ duration: 0.2 }}
+                    transition={{ duration: 0.5, repeat: loading ? Infinity : 0 }}
                   >
                     {loading ? (
                       <>
-                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-                        </svg>
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                          className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
+                        />
                         <span>Sharing...</span>
                       </>
                     ) : (
                       <>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M12 20.94c1.5 0 2.75 1.06 4 1.06 3 0 6-8 6-12.22A4.91 4.91 0 0 0 17 5c-2.22 0-4 1.44-5 2-1-.56-2.78-2-5-2a4.9 4.9 0 0 0-5 4.78C2 14 5 22 8 22c1.25 0 2.5-1.06 4-1.06Z"/>
-                          <path d="M10 7c-.5 3-1 6-1.5 9"/>
-                          <path d="M14 7c.5 3 1 6 1.5 9"/>
-                        </svg>
-                        <span>Confess</span>
+                        <span className="text-base">Confess</span>
                       </>
                     )}
                   </motion.div>
+                  
+                  {/* Button glow effect */}
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-cyan-400/50 via-blue-400/50 to-indigo-400/50 rounded-xl blur-xl opacity-0 group-hover/button:opacity-70 transition-opacity duration-300"
+                    style={{ zIndex: -1 }}
+                  />
                 </motion.button>
               </motion.div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Error Message */}
       <AnimatePresence>
         {errorMessage && (
           <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
             className="mt-4"
           >
-            <div className="text-red-500 text-sm bg-red-500/10 p-3 rounded-xl">
-              {errorMessage}
+            <div className="text-red-400 text-sm bg-red-500/10 border border-red-500/20 p-4 rounded-xl backdrop-blur-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-red-400" />
+                </div>
+                {errorMessage}
+              </div>
             </div>
           </motion.div>
         )}

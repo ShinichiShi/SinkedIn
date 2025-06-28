@@ -9,7 +9,6 @@ import { SpeedInsights } from "@vercel/speed-insights/next"
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { clsx } from "clsx";
-import { twMerge } from "tailwind-variants";
 import { cn } from "@/lib/utils";
 
 
@@ -31,20 +30,16 @@ export default function RootLayout({
         <meta name="theme-color" content="#000000" />
       </head>
 
-      <body className={cn(
-        inter.className,
-        "min-h-screen bg-background font-sans antialiased overflow-x-hidden"
-      )}>
-        <ThemeProvider
-          attribute="class"
+    <body className="min-h-screen bg-background font-sans antialiased overflow-x-hidden">
+  <ThemeProvider   attribute="class"
           defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-            <div className="relative flex min-h-screen flex-col">
-              <Navbar />
-              <ToastContainer 
+    <AuthProvider>
+      <div className="flex min-h-screen flex-col relative">
+        <Navbar />
+           <ToastContainer 
                 position="top-right" 
                 autoClose={3000}
                 hideProgressBar={false}
@@ -56,33 +51,27 @@ export default function RootLayout({
                 pauseOnHover
                 theme="colored"
               />
-              <main className="flex-1 pt-16">
-                {children}
-              </main>
-              <footer className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-                <div className="container flex h-14 items-center justify-between py-6">
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    © {new Date().getFullYear()} SinkedIn. All rights reserved.
-                  </p>
-                  <nav className="flex items-center space-x-4">
-                    <a href="/about" className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-                      About
-                    </a>
-                    <a href="/privacy" className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-                      Privacy
-                    </a>
-                    <a href="/terms" className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-                      Terms
-                    </a>
-                  </nav>
-                </div>
-              </footer>
-            </div>
-            <Chatbot />
-          </AuthProvider>
-        </ThemeProvider>
-        <SpeedInsights/>
-      </body>
+        <main className="flex-1 pt-16 flex flex-col">
+          {children}
+        </main>
+        <footer className="fixed bottom-0 left-0 w-full border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
+                  <div className="container mx-auto px-4 flex h-14 items-center justify-between py-6">
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      © {new Date().getFullYear()} SinkedIn. All rights reserved.
+                    </p>
+                    <nav className="flex items-center space-x-4">
+                      <a href="/about" className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">About</a>
+                      <a href="/privacy" className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">Privacy</a>
+                      <a href="/terms" className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">Terms</a>
+                    </nav>
+                  </div>
+                </footer>
+              </div>
+              <Chatbot />
+            </AuthProvider>
+          </ThemeProvider>
+          <SpeedInsights />
+        </body>
     </html>
   );
 }

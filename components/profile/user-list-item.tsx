@@ -36,7 +36,7 @@ export function UserListItem({ userId }: { userId: string }) {
   if (!user) return null;
 
   return (
-    <Link href={`/networkpost/${user.id}`}>
+    <Link href={`/profile/${user.id}`}>
       <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
         <Card className="p-4 bg-black/20 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all duration-300">
           <div className="flex items-center gap-4">

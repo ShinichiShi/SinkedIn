@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Users, Briefcase, BookOpen } from "lucide-react";
+import { Users } from "lucide-react";
 import { buttonVariants } from "../ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { Button } from "../ui/button";
@@ -15,14 +15,14 @@ interface UserData {
   location?: string;
   bio?: string;
   profilepic?: string;
-
+  followers: string[];
+  following: string[];
 }
 
 export function LeftSidebar() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const router = useRouter();
-
-  const fetchUserData = async () => {
+  const fetchUserData = useCallback(async () => {
     const auth = getAuth(firebaseApp);
     const user = auth.currentUser;
     if (!user) {
@@ -42,6 +42,8 @@ export function LeftSidebar() {
           bio: "Embracing failures as stepping stones to success",
           profilepic: "/default-avatar.png",
           location: "Unknown",
+          followers: [],
+          following: []
         });
       }   
     } catch (error) {
@@ -51,14 +53,16 @@ export function LeftSidebar() {
         email: user?.email || "user@example.com",
         bio: "Embracing failures as stepping stones to success",
         profilepic: "/default-avatar.png",
-        location: "Unknown"
+        location: "Unknown",
+        followers: [],
+        following: []
       });
     } 
-  }
+  }, [router]);
     
   useEffect(() => {
     fetchUserData();   
-  }, [])
+  }, [fetchUserData])
 
   const dummyUserData = {
     username: "Anonymous User",
@@ -115,40 +119,41 @@ export function LeftSidebar() {
             <span>Edit Profile
             </span>
           </Link>
-      </div>
-
-        <nav className="space-y-2">
-          <Link
-            href="/network"
-            className={buttonVariants({
-              variant: "ghost",
-              className: "flex items-center w-full p-3",
-            })}
-          >
-            <Users className="h-5 w-5 mr-3" />
-            <span>Network</span>
-          </Link>
-          <Link
-            href="/jobs"
-            className={buttonVariants({
-              variant: "ghost",
-              className: "flex items-center w-full p-3",
-            })}
-          >
-            <Briefcase className="h-5 w-5 mr-3" />
-            <span>Failed Jobs</span>
-          </Link>
-          <Link
-            href="/learning"
-            className={buttonVariants({
-              variant: "ghost",
-              className: "flex items-center w-full p-3",
-            })}
-          >
-            <BookOpen className="h-5 w-5 mr-3" />
-            <span>Learning</span>
-          </Link>
-        </nav>
+      </div>        <div className="p-4 rounded-lg border border-border bg-card/30 backdrop-blur-sm">
+          <h3 className="text-sm font-medium text-muted-foreground mb-3">Network Stats</h3>
+          <nav className="space-y-2">
+            <Link
+              href={`/profile`}
+              className={buttonVariants({
+                variant: "ghost",
+                className: "flex items-center justify-between w-full p-3 hover:bg-accent/50",
+              })}
+            >
+              <div className="flex items-center">
+                <Users className="h-5 w-5 mr-3 text-primary" />
+                <span>Followers</span>
+              </div>
+              <span className="text-sm bg-primary/10 px-2 py-1 rounded-full text-primary">
+                {userData?.followers?.length || 0}
+              </span>
+            </Link>
+            <Link
+              href={`/profile`}
+              className={buttonVariants({
+                variant: "ghost",
+                className: "flex items-center justify-between w-full p-3 hover:bg-accent/50",
+              })}
+            >
+              <div className="flex items-center">
+                <Users className="h-5 w-5 mr-3 text-primary" />
+                <span>Following</span>
+              </div>
+              <span className="text-sm bg-primary/10 px-2 py-1 rounded-full text-primary">
+                {userData?.following?.length || 0}
+              </span>
+            </Link>
+          </nav>
+        </div>
       </div>
     </div>
   );
