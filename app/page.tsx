@@ -32,10 +32,9 @@ export default function Home() {
     };
   }, []);
 
-  return (  
-    <div id="vanta-bg" className="min-h-screen w-full flex flex-col items-center justify-center">
+  return (    <div id="vanta-bg" className="min-h-screen w-full flex flex-col items-center justify-center relative -mt-14">
       <div className="absolute inset-0 bg-black opacity-70"></div>
-        <main className="container mx-auto px-6 py-16">
+        <main className="container mx-auto px-6 py-16 relative z-10 -mt-8">
           <div 
             className="text-center space-y-6"
           >
