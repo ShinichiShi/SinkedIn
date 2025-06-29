@@ -29,6 +29,7 @@ import { formatRelativeTime } from "@/utils/timeUtils";
 import Hero from "@/components/profile/Hero";
 import Editmodal from "@/components/profile/Editmodal";
 import { uploadToCloudinary } from "@/lib/cloudinary";
+import { FaSailboat } from "react-icons/fa6";
 const MotionButton = motion.button;
 
 export default function Profile() {
