@@ -1,49 +1,41 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
-import { ThumbsDown, MessageCircle, Link2, Pencil, LogOut } from "lucide-react";
-import { doc, getDoc, collection, query, getDocs, updateDoc } from "firebase/firestore";
+import { 
+  doc, 
+  getDoc, 
+  collection, 
+  query, 
+  getDocs, 
+  updateDoc, 
+  arrayUnion, 
+  arrayRemove, 
+  increment 
+} from "firebase/firestore";
 import Image from "next/image";
+import { UserPlus, UserMinus } from "lucide-react";
 import { getAuth, signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 import { firebaseApp, db } from "@/lib/firebase";
 import { toast } from "react-toastify";
 import { UserListItem } from "@/components/profile/user-list-item";
-import { CloudinaryUploadWidget } from "@/components/ui/cloudinary-upload-widget";
-
-interface UserData {
-  username: string;
-  email: string;
-  location?: string;
-  bio?: string;
-  profilepic?: string;
-  backgroundImage?: string;
-  failedExperience?: string[];
-  misEducation?: string[];
-  failureHighlights?: string[];
-  followers: string[];
-  following: string[];
-}
-
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-  userId: string;
-  timestamp: any;
-  dislikes?: number;
-  comments?: any[];
-  shares?: number;
-}
+import { UserData, Post } from "@/types/index";
+import CommentSection from "@/components/post/CommentSection";
+import PostActions from "@/components/post/PostActions";
+import ImageGallery from "@/components/post/ImageGallery";
+import PostContent from "@/components/post/PostContent";
+import { formatRelativeTime } from "@/utils/timeUtils";
+import Hero from "@/components/profile/Hero";
+import Editmodal from "@/components/profile/Editmodal";
+import { uploadToCloudinary } from "@/lib/cloudinary";
+const MotionButton = motion.button;
 
 export default function Profile() {
   const [activeTab, setActiveTab] = useState<'posts' | 'followers' | 'following'>('posts');
   const [userData, setUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [commentBoxStates, setCommentBoxStates] = useState<{[key: string]: boolean}>({});
   const [edit, setEdit] = useState<UserData>({
     username: "",
     email: "",
@@ -59,17 +51,33 @@ export default function Profile() {
   });
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [posts, setPosts] = useState<Post[]>([]);
+  const [cachedUsers, setCachedUsers] = useState<Map<string, any>>(new Map());
   const [isUploading, setIsUploading] = useState(false);
+  const [commentInputs, setCommentInputs] = useState<{[key: string]: string}>({});
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [dislikedPosts, setDislikedPosts] = useState<string[]>([]);
+  const [userFollowing, setUserFollowing] = useState<string[]>([]);
+
   const router = useRouter();
+  const auth = getAuth(firebaseApp);
+
+  const toggleCommentBox = (postId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setCommentBoxStates((prev) => ({
+      ...prev,
+      [postId]: !prev[postId],
+    }));
+  };
 
   const fetchUserData = useCallback(async () => {
-    const auth = getAuth(firebaseApp);
     const user = auth.currentUser;
     
     if (!user) {
       router.push("/login");
       return;
     }
+
+    setCurrentUser(user);
 
     try {
       const userDoc = doc(db, "users", user.uid);
@@ -78,6 +86,7 @@ export default function Profile() {
       if (docSnap.exists()) {
         const fetchedUserData = docSnap.data() as UserData;
         setUserData(fetchedUserData);
+        setUserFollowing(fetchedUserData.following || []);
         
         setEdit({
           username: fetchedUserData.username || "",
@@ -111,20 +120,230 @@ export default function Profile() {
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, auth]);
 
   useEffect(() => {
     fetchUserData();
   }, [fetchUserData]);
-
+const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
+  setEdit(prev => ({ ...prev, [field]: values }));
+};
   const handleLogout = async () => {
     try {
-      const auth = getAuth(firebaseApp);
       await signOut(auth);
       router.push("/login");
     } catch (error) {
       console.error("Error during logout:", error);
       toast.error("Logout failed");
+    }
+  };
+
+  const handlePostClick = (postId: string) => {
+    router.push(`/post/${postId}`);
+  };
+
+  const handleFollow = async (targetUserId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!currentUser) {
+      toast.error("Please log in to follow users");
+      router.push("/login");
+      return;
+    }
+
+    try {
+      // Update current user's following list
+      const currentUserRef = doc(db, "users", currentUser.uid);
+      await updateDoc(currentUserRef, {
+        following: arrayUnion(targetUserId)
+      });
+
+      // Update target user's followers list
+      const targetUserRef = doc(db, "users", targetUserId);
+      await updateDoc(targetUserRef, {
+        followers: arrayUnion(currentUser.uid)
+      });
+
+      // Update local state
+      setUserFollowing(prev => [...prev, targetUserId]);
+      toast.success("Successfully followed user!");
+    } catch (error) {
+      console.error("Error following user:", error);
+      toast.error("Failed to follow user");
+    }
+  };
+
+  const handleUnfollow = async (targetUserId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!currentUser) {
+      toast.error("Please log in to unfollow users");
+      router.push("/login");
+      return;
+    }
+
+    try {
+      // Update current user's following list
+      const currentUserRef = doc(db, "users", currentUser.uid);
+      await updateDoc(currentUserRef, {
+        following: arrayRemove(targetUserId)
+      });
+
+      // Update target user's followers list
+      const targetUserRef = doc(db, "users", targetUserId);
+      await updateDoc(targetUserRef, {
+        followers: arrayRemove(currentUser.uid)
+      });
+
+      // Update local state
+      setUserFollowing(prev => prev.filter(id => id !== targetUserId));
+      toast.success("Successfully unfollowed user!");
+    } catch (error) {
+      console.error("Error unfollowing user:", error);
+      toast.error("Failed to unfollow user");
+    }
+  };
+
+  const handleDislike = async (postId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      if (!currentUser) {
+        toast.error("You need to be logged in to dislike a post.");
+        return;
+      }
+
+      const postRef = doc(db, "posts", postId);
+      const postIndex = posts.findIndex((post) => post.id === postId);
+      const post = posts[postIndex];
+      const userId = currentUser.uid;
+      const hasDisliked = post.dislikedBy?.includes(userId);
+
+      if (hasDisliked) {
+        const updatedDislikedBy = post.dislikedBy.filter((id: string) => id !== userId);
+        await updateDoc(postRef, {
+          dislikes: Math.max((post.dislikes || 0) - 1, 0),
+          dislikedBy: updatedDislikedBy,
+        });
+
+        setPosts((prevPosts) =>
+          prevPosts.map((p) =>
+            p.id === postId ? {
+              ...p,
+              dislikes: Math.max((p.dislikes || 0) - 1, 0),
+              dislikedBy: updatedDislikedBy,
+            } : p
+          )
+        );
+        setDislikedPosts(dislikedPosts.filter((id) => id !== postId));
+      } else {
+        const updatedDislikedBy = [...(post.dislikedBy || []), userId];
+        await updateDoc(postRef, {
+          dislikes: (post.dislikes || 0) + 1,
+          dislikedBy: updatedDislikedBy,
+        });
+
+        setPosts((prevPosts) =>
+          prevPosts.map((p) =>
+            p.id === postId ? {
+              ...p,
+              dislikes: (p.dislikes || 0) + 1,
+              dislikedBy: updatedDislikedBy,
+            } : p
+          )
+        );
+        setDislikedPosts([...dislikedPosts, postId]);
+      }
+    } catch (error) {
+      console.error("Error updating dislikes:", error);
+      toast.error("Failed to update dislike.");
+    }
+  };
+
+  const handlePostComment = async (postId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      if (!currentUser) {
+        toast.error("Please log in to comment");
+        return;
+      }
+
+      const commentText = commentInputs[postId];
+      if (!commentText?.trim()) {
+        toast.error("Comment cannot be empty");
+        return;
+      }
+
+      const postRef = doc(db, "posts", postId);
+      const postIndex = posts.findIndex((post) => post.id === postId);
+      const post = posts[postIndex];
+
+      let userProfilePic = cachedUsers.get(currentUser.uid)?.profilepic;
+      if (!userProfilePic) {
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          userProfilePic = userData.profilepic;
+          setCachedUsers(prev => new Map(prev).set(currentUser.uid, userData));
+        }
+      }
+
+      const newComment = {
+        userId: currentUser.uid,
+        userName: currentUser.displayName || "Anonymous",
+        text: commentText,
+        profilePic: userProfilePic || null,
+        timestamp: new Date()
+      };
+
+      const updatedComments = [...(post.comments || []), newComment];
+      
+      await updateDoc(postRef, {
+        comments: updatedComments,
+      });
+
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.id === postId ? { ...p, comments: updatedComments } : p
+        )
+      );
+
+      setCommentInputs((prev) => ({
+        ...prev,
+        [postId]: "",
+      }));
+
+      toast.success("Comment added successfully!");
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      toast.error("Failed to add comment");
+    }
+  };
+
+  const handleShare = async (postId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      const postRef = doc(db, "posts", postId);
+      await updateDoc(postRef, {
+        shares: increment(1),
+      });
+
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.id === postId ? { ...p, shares: (p.shares || 0) + 1 } : p
+        )
+      );
+
+      const shareUrl = `${window.location.origin}/post/${postId}`;
+      if (navigator.share) {
+        await navigator.share({
+          title: "Check out this post!",
+          url: shareUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Post link copied to clipboard!");
+      }
+    } catch (error) {
+      console.error("Error sharing post:", error);
+      toast.error("Failed to share post.");
     }
   };
 
@@ -183,7 +402,7 @@ export default function Profile() {
     setEdit(prev => {
       const currentArray = prev[key] as string[] | undefined;
       if (!currentArray) return prev;
-  
+
       const updatedArray = [...currentArray];
       updatedArray.splice(index, 1);
       return {
@@ -202,7 +421,6 @@ export default function Profile() {
   };
 
   const handleImageUpload = async (url: string, type: 'profile' | 'background') => {
-    const auth = getAuth(firebaseApp);
     const user = auth.currentUser;
     
     if (!user) {
@@ -233,7 +451,6 @@ export default function Profile() {
   const handleSave = async () => {
     try {
       setIsUploading(true);
-      const auth = getAuth(firebaseApp);
       const user = auth.currentUser;
       
       if (!user) {
@@ -296,157 +513,12 @@ export default function Profile() {
       ) : (
         <>
           {/* Hero Section */}
-          <div className="relative w-full h-64 sm:h-80 overflow-hidden">
-            {/* Background Image or Gradient */}
-            <div 
-              className="absolute inset-0"
-              style={{
-                backgroundImage: userData?.backgroundImage 
-                  ? `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url(${userData.backgroundImage})`
-                  : 'linear-gradient(135deg, #1e3a8a 0%, #3730a3 50%, #581c87 100%)',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                
-              }}
-            />
-            
-            {/* Profile Content */}
-            <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-8">              {/* Mobile Layout */}
-              <div className="block sm:hidden ">
-                {/* Profile Picture - Centered on mobile */}
-                <div className="flex justify-center mt-6">
-                  <div className="w-24 h-24 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-gray-200 mt-4">
-                    {userData?.profilepic ? (
-                      <img 
-                        src={userData.profilepic} 
-                        alt={userData.username || "Profile"}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-2xl font-bold text-gray-600 bg-gray-100">
-                        {userData?.username?.[0]?.toUpperCase() || '?'}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Profile Info - Centered on mobile */}
-                <div className="text-center">
-                  <h1 className="text-2xl font-bold text-white mb-2">
-                    {userData?.username || 'Unknown User'}
-                  </h1>
-                  {userData?.bio && (
-                    <p className="text-gray-200 text-sm mb-3 px-2">
-                      {userData.bio}
-                    </p>
-                  )}
-                  <div className="flex flex-col gap-2 items-center">
-                    {userData?.location && (
-                      <div className="flex items-center gap-1 text-gray-300 text-sm">
-                        <span>📍</span>
-                        <span>{userData.location}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-4 text-xs text-gray-300">
-                      <span className="font-medium">{userData?.followers?.length || 0} Followers</span>
-                      <span className="font-medium">{userData?.following?.length || 0} Following</span>
-                    </div>
-                  </div>
-
-                  {/* Action Buttons - Mobile */}
-                  <div className="flex gap-2 justify-center mt-4">
-                    <Button
-                      onClick={handleOpenModal}
-                      variant="outline"
-                      size="sm"
-                      className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm text-xs"
-                    >
-                      <Pencil className="h-3 w-3 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      onClick={handleLogout}
-                      variant="destructive"
-                      size="sm"
-                      className="bg-red-600/80 hover:bg-red-700 border-none text-xs"
-                    >
-                      <LogOut className="h-3 w-3 mr-1" />
-                      Logout
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Desktop Layout */}
-              <div className="hidden sm:flex items-end gap-6">
-                {/* Profile Picture */}
-                <div className="relative">
-                  <div className="w-32 h-32 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-gray-200">
-                    {userData?.profilepic ? (
-                      <img 
-                        src={userData.profilepic} 
-                        alt={userData.username || "Profile"}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-4xl font-bold text-gray-600 bg-gray-100">
-                        {userData?.username?.[0]?.toUpperCase() || '?'}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Profile Info */}
-                <div className="flex-1 pb-4">
-                  <div className="flex items-end justify-between">
-                    <div>
-                      <h1 className="text-4xl font-bold text-white mb-2">
-                        {userData?.username || 'Unknown User'}
-                      </h1>
-                      {userData?.bio && (
-                        <p className="text-gray-200 text-lg mb-3 max-w-md">
-                          {userData.bio}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-6">
-                        {userData?.location && (
-                          <div className="flex items-center gap-1 text-gray-300">
-                            <span>📍</span>
-                            <span>{userData.location}</span>
-                          </div>
-                        )}
-                        <div className="flex items-center gap-4 text-sm text-gray-300">
-                          <span className="font-medium">{userData?.followers?.length || 0} Followers</span>
-                          <span className="font-medium">{userData?.following?.length || 0} Following</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-3">
-                      <Button
-                        onClick={handleOpenModal}
-                        variant="outline"
-                        className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
-                      >
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Edit
-                      </Button>
-                      <Button
-                        onClick={handleLogout}
-                        variant="destructive"
-                        className="bg-red-600/80 hover:bg-red-700 border-none"
-                      >
-                        <LogOut className="h-4 w-4 mr-2" />
-                        Logout
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
+          <Hero 
+            userData={userData}
+            handleOpenModal={handleOpenModal}
+            handleLogout={handleLogout}
+          />
+         
           {/* Tabs and Content */}
           <div className="bg-slate-900">
             {/* Tabs */}
@@ -483,7 +555,8 @@ export default function Profile() {
             <div className="container max-w-6xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
               {activeTab === 'followers' && (
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
-                    {(userData?.followers??[]).map((followerId) => (                    <div
+                  {(userData?.followers ?? []).map((followerId) => (
+                    <div
                       key={followerId}
                       className="transform transition-all duration-300 hover:scale-105"
                     >
@@ -502,7 +575,7 @@ export default function Profile() {
 
               {activeTab === 'following' && (
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
-                  {(userData?.following??[]).map((followingId) => (
+                  {(userData?.following ?? []).map((followingId) => (
                     <div
                       key={followingId}
                       className="transform transition-all duration-300 hover:scale-105"
@@ -522,63 +595,129 @@ export default function Profile() {
 
               {activeTab === 'posts' && (
                 <div className="space-y-4 sm:space-y-6">
-                  {posts.map((post) => (
-                    <Card
-                      key={post.id}
-                      onClick={() => router.push(`/post/${post.id}`)}
-                      className="p-4 sm:p-6 bg-slate-800/50 border-slate-700 hover:bg-slate-800/70 transition-all duration-300 cursor-pointer backdrop-blur-sm"
-                    >
-                      <div className="flex items-start space-x-3 sm:space-x-4 mb-4">
-                        <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full overflow-hidden flex-shrink-0">
-                          {userData?.profilepic ? (
-                            <img
-                              src={userData.profilepic}
-                              alt={userData.username || "Profile"}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-lg sm:text-xl font-bold bg-gray-600 text-white">
-                              {userData?.username?.[0]?.toUpperCase() || '?'}
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-white text-base sm:text-lg">
-                            {userData?.username || "Anonymous"}
-                          </h3>
-                          <p className="text-xs sm:text-sm text-gray-400">
-                            {post.timestamp ? new Date(post.timestamp.toDate()).toLocaleString() : ""}
-                          </p>
-                        </div>
-                      </div>
+                  <AnimatePresence>
+                    {posts
+                    .slice()
+                      .sort((a, b) => {
+                        const aTime = a.timestamp instanceof Date
+                          ? a.timestamp.getTime()
+                          : (a.timestamp?.seconds || 0) * 1000;
                       
-                      <div className="text-gray-100 leading-relaxed whitespace-pre-wrap mb-4 p-3 sm:p-4 bg-slate-700/30 rounded-lg text-sm sm:text-base">
-                        {post.content}
-                      </div>
+                        const bTime = b.timestamp instanceof Date
+                          ? b.timestamp.getTime()
+                          : (b.timestamp?.seconds || 0) * 1000;
+                      
+                        return bTime - aTime; // latest first
+                      })
+                    .map((post) => (
+                      <motion.div
+                        key={post.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200"
+                      >
+                        <div onClick={() => handlePostClick(post.id)}>
+                           <div className="p-2 px-3 pb-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <div className="relative">
+                                  {userData?.profilepic ? (
+                                    <Image
+                                      src={userData.profilepic}
+                                      alt={`${userData.username}'s profile`}
+                                      height={40}
+                                      width={40}
+                                      className="w-10 h-10 rounded-full"
+                                    />
+                                  ) : (
+                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                                      {post.userName.charAt(0).toUpperCase()}
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <h3 className="font-semibold text-gray-900 dark:text-white">
+                                    {post.userName}
+                                  </h3>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    {formatRelativeTime(post.timestamp)}
+                                  </p>
+                                </div>
+                              </div>
 
-                      <div className="flex justify-between pt-3 sm:pt-4 border-t border-slate-700">
-                        <div className="flex items-center space-x-1 sm:space-x-2 text-gray-400 hover:text-red-400 transition-colors">
-                          <ThumbsDown className="h-4 w-4 sm:h-5 sm:w-5" />
-                          <span className="text-sm">{post.dislikes || 0}</span>
+                              {currentUser && post.userId !== currentUser.uid && (
+                                <MotionButton
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={(e) => 
+                                    userFollowing.includes(post.userId) 
+                                      ? handleUnfollow(post.userId, e)
+                                      : handleFollow(post.userId, e)
+                                  }
+                                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 flex items-center gap-1 ${
+                                    userFollowing.includes(post.userId)
+                                      ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                                  }`}
+                                >
+                                  {userFollowing.includes(post.userId) ? (
+                                    <>
+                                      <UserMinus size={14} />
+                                      Unfollow
+                                    </>
+                                  ) : (
+                                    <>
+                                      <UserPlus size={14} />
+                                      Follow
+                                    </>
+                                  )}
+                                </MotionButton>
+                              )}
+                            </div>
+                          </div>
+                          <PostContent content={post.content}/>
                         </div>
-                        <div className="flex items-center space-x-1 sm:space-x-2 text-gray-400 hover:text-blue-400 transition-colors">
-                          <MessageCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                          <span className="text-sm">{post.comments?.length || 0}</span>
+
+                        {/* Image Gallery */}
+                        <div className="px-4">
+                          <ImageGallery images={post.images || []} postId={post.id} />
                         </div>
-                        <div className="flex items-center space-x-1 sm:space-x-2 text-gray-400 hover:text-green-400 transition-colors">
-                          <Link2 className="h-4 w-4 sm:h-5 sm:w-5" />
-                          <span className="text-sm">{post.shares || 0}</span>
-                        </div>
+                    
+                        {/* Post Actions */}
+                        <PostActions 
+                          post={post}
+                          currentUser={currentUser}
+                          onDislike={handleDislike}
+                          onShare={handleShare}
+                          onToggleComment={toggleCommentBox}
+                        />
+                    
+                        {/* Comment Section */}
+                        <CommentSection 
+                          post={post}
+                          currentUser={userData}
+                          cachedUsers={cachedUsers}
+                          onCommentInputChange={(postId: string, value: string) => {
+                            setCommentInputs(prev => ({
+                              ...prev,
+                              [postId]: value
+                            }));
+                          }}
+                          onPostComment={handlePostComment}
+                          commentInput={commentInputs[post.id]}
+                          commentBoxStates={commentBoxStates}
+                        />  
+                      </motion.div>
+                    ))}
+                    {posts.length === 0 && (
+                      <div className="text-center py-8 sm:py-12">
+                        <div className="text-4xl sm:text-6xl mb-4">📝</div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No posts yet</h3>
+                        <p className="text-gray-400 text-sm sm:text-base">Share your first failure story!</p>
                       </div>
-                    </Card>
-                  ))}
-                  {posts.length === 0 && (
-                    <div className="text-center py-8 sm:py-12">
-                      <div className="text-4xl sm:text-6xl mb-4">📝</div>
-                      <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No posts yet</h3>
-                      <p className="text-gray-400 text-sm sm:text-base">Share your first failure story!</p>
-                    </div>
-                  )}
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
             </div>
@@ -586,117 +725,15 @@ export default function Profile() {
 
           {/* Edit Profile Modal */}
           {isModalOpen && (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 overflow-y-auto">
-              <div className="flex min-h-full items-center justify-center p-4">
-                <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto">
-                  <div className="bg-slate-800 border border-slate-700 rounded-lg shadow-2xl p-4 sm:p-6">
-                    <div className="flex justify-between items-center mb-4 sm:mb-6">
-                      <h2 className="text-lg sm:text-xl font-semibold text-white">Edit Profile</h2>
-                      <button
-                        onClick={handleCloseModal}
-                        className="text-gray-400 hover:text-white transition-colors text-xl"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                    
-                    <div className="space-y-4 sm:space-y-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">Background Image</label>
-                        {edit.backgroundImage && (
-                          <div className="relative h-24 sm:h-32 w-full rounded-lg border-2 border-dashed border-slate-600 overflow-hidden mb-2">
-                            <img
-                              src={edit.backgroundImage}
-                              alt="Background"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-                        <CloudinaryUploadWidget 
-                          onUploadSuccess={handleBackgroundImageUpload}
-                          variant="background"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-2">Profile Picture</label>
-                        {edit.profilepic && (
-                          <div className="relative h-24 w-24 sm:h-32 sm:w-32 rounded-full border-2 border-dashed border-slate-600 overflow-hidden mx-auto mb-2">
-                            <img
-                              src={edit.profilepic}
-                              alt="Profile"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-                        <CloudinaryUploadWidget
-                          onUploadSuccess={handleProfileImageUpload}
-                          variant="profile"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Username</label>
-                        <input
-                          type="text"
-                          id="username"
-                          value={edit.username}
-                          onChange={handleEditChange}
-                          className="w-full px-3 py-2 rounded-md border border-slate-600 bg-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Bio</label>
-                        <textarea
-                          id="bio"
-                          value={edit.bio}
-                          onChange={handleEditChange}
-                          rows={3}
-                          className="w-full px-3 py-2 rounded-md border border-slate-600 bg-slate-700 text-white resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-                          placeholder="Write a short bio..."
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-300 mb-1">Location</label>
-                        <input
-                          type="text"
-                          id="location"
-                          value={edit.location}
-                          onChange={handleEditChange}
-                          className="w-full px-3 py-2 rounded-md border border-slate-600 bg-slate-700 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm sm:text-base"
-                          placeholder="Where are you located?"
-                        />
-                      </div>
-
-                      <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 mt-6 sm:mt-8">
-                        <button
-                          onClick={handleCloseModal}
-                          className="px-4 py-2 text-sm font-medium rounded-md border border-slate-600 text-gray-300 hover:bg-slate-700 transition-all order-2 sm:order-1"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          onClick={handleSave}
-                          disabled={isUploading}
-                          className="px-4 py-2 text-sm font-medium rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed order-1 sm:order-2"
-                        >
-                          {isUploading ? (
-                            <span className="flex items-center justify-center gap-2">
-                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                              Saving...
-                            </span>
-                          ) : (
-                            "Save Changes"
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+            <Editmodal 
+              handleCloseModal={handleCloseModal}
+              edit={edit}
+              uploadToCloudinary={uploadToCloudinary}
+              isUploading={isUploading}
+              handleArrayFieldChange={handleArrayFieldChange}
+              handleEditChange={handleEditChange}
+              handleSave={handleSave}
+            />
           )}
         </>
       )}

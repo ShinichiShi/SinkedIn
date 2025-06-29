@@ -8,6 +8,11 @@ import { firebaseApp } from "@/lib/firebase";
 import { getAuth } from "firebase/auth";
 import { HashLoader as Loader } from "react-spinners";
 import { toast } from "react-toastify";
+import ImageGallery from "@/components/post/ImageGallery";
+import PostContent from "@/components/post/PostContent";
+import PostHeader from "@/components/post/PostHeader";
+import PostActions from "@/components/post/PostActions";
+import CommentSection from "@/components/post/CommentSection";
 import { 
   collection, 
   query, 
@@ -24,33 +29,9 @@ import {
   where
 } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
-import { motion } from "framer-motion";
-import { ThumbsDown, MessageCircle, Link2, UserPlus, UserMinus } from "lucide-react";
-import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
 import type { ReactElement, FC, ReactNode } from 'react';
-import type { ForwardRefComponent } from 'framer-motion';
-
-type Post = {
-  id: string;
-  content: string;
-  userName: string;
-  userProfilePic?: string;
-  userId: string;
-  timestamp: { seconds: number } | null;
-  createdAt?: string;
-  dislikes: number;
-  dislikedBy: string[];
-  shares: number;
-  comments: Comment[];
-};
-
-type Comment = {
-  userId: string;
-  userName: string;
-  text: string;
-  profilePic?: string;
-  timestamp: string;
-};
+import {Post, Comment} from "@/types";
 
 const MotionButton = motion.button;
 
@@ -174,8 +155,6 @@ export default function Feed(): ReactElement {
       // Get unique user IDs from new posts that aren't already cached
       const allUserIds = Array.from(new Set(newPostsData.map((post: Post) => post.userId)));
       const uncachedUserIds = allUserIds.filter(userId => !cachedUsers.has(userId));
-      
-      // console.log(`Load more - Total users needed: ${allUserIds.length}, Cached: ${allUserIds.length - uncachedUserIds.length}, New fetches: ${uncachedUserIds.length}`);
       
       let currentUserCache = new Map(cachedUsers);
       
@@ -363,9 +342,16 @@ export default function Feed(): ReactElement {
         comments: updatedComments,
       });
 
+      const fixedComments: Comment[] = updatedComments.map((comment) => ({
+        ...comment,
+        timestamp: comment.timestamp instanceof Date
+          ? comment.timestamp
+          : new Date(comment.timestamp),
+      }));       
+
       setPosts((prevPosts) =>
         prevPosts.map((p) =>
-          p.id === postId ? { ...p, comments: updatedComments } : p
+          p.id === postId ? { ...p, comments: fixedComments } : p
         )
       );
 
@@ -409,40 +395,6 @@ export default function Feed(): ReactElement {
         });
       }
       setCachedUsers(currentUserCache);
-    }
-  };
-
-  const formatRelativeTime = (timestamp: any): string => {
-    if (!timestamp) return "";
-
-    const now = new Date();
-    const postDate = timestamp?.seconds
-      ? new Date(timestamp.seconds * 1000)
-      : new Date(timestamp);
-
-    if (!(postDate instanceof Date) || isNaN(postDate.getTime())) {
-      return "";
-    }
-
-    const diffInMs = now.getTime() - postDate.getTime();
-    const diffInSeconds = Math.floor(diffInMs / 1000);
-    const diffInMinutes = Math.floor(diffInMs / (1000 * 60));
-    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
-    const diffInDays = Math.floor(diffInMs / (1000 * 60 * 60 * 24));
-
-    if (diffInSeconds < 60) {
-      return "Just now";
-    } else if (diffInMinutes < 60) {
-      return `${diffInMinutes}m ago`;
-    } else if (diffInHours < 24) {
-      return `${diffInHours}h ago`;
-    } else if (diffInDays < 7) {
-      return `${diffInDays} day${diffInDays === 1 ? "" : "s"} ago`;
-    } else {
-      return postDate.toLocaleDateString("en-GB", {
-        day: "numeric",
-        month: "short",
-      });
     }
   };
 
@@ -580,178 +532,119 @@ export default function Feed(): ReactElement {
 
   if (loading) return (
     <div className="flex h-screen items-center justify-center">
-      <div><Loader loading={true} size={50} color="white" /></div>
+      <CustomLoader loading={loading} size={50} color="#3b82f6" />
     </div>
   );
 
   return (
-    <div className="container max-h-screen mx-auto px-4 py-8 -mt-7">
-      <aside className="lg:block">
-        <div><LeftSidebar /></div>
-      </aside>
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 container">
+      <div className="flex max-w-7xl mx-auto">
+        {/* Left Sidebar */}
+            <aside className="hidden lg:block w-64">
+      <LeftSidebar />
+    </aside>
       
-      <main className="flex-1 h-screen overflow-y-auto max-h-[calc(100vh-120px)] max-w-2xl md:mx-[28%] no-scrollbar">
-        <CreatePost />
-        
-        {posts.map((post) => (          
-          <div
-            key={post.id}
-            onClick={() => handlePostClick(post.id)}
-            className="bg-white dark:bg-card/80 text-card-foreground rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 p-4 space-y-6 mb-4 cursor-pointer border-2 border-gray-200 dark:border-white/20 hover:border-gray-300 dark:hover:border-white/40 backdrop-filter backdrop-blur-sm hover:bg-gray-50 dark:hover:bg-accent/5"
-          >
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 rounded-full overflow-hidden relative ring-2 ring-primary/20 ring-offset-2 ring-offset-background transition-all duration-300 hover:ring-primary/40">
-                <Image
-                    src={post.userProfilePic || "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"}
-                    alt={`${post.userName}'s avatar`}
-                    width={48}
-                    height={48}
-                    className="w-full h-full object-cover"
-                  />
-              </div>              
-              <div className="flex-1">
-                <div className="flex justify-between items-start">                  
-                  <div>
-                    <h3 className="font-semibold text-base text-foreground hover:text-primary transition-colors duration-200">{post.userName || "Anonymous"}</h3>
-                    <p className="text-sm text-muted-foreground/80">
-                      {formatRelativeTime(post.timestamp || post.createdAt)}
-                    </p>
-                  </div>
-                </div>
+       <main className="flex-1 overflow-y-auto max-h-[calc(100vh-120px)] no-scrollbar px-4 py-6 lg:mr-80">
+      <div className="max-w-2xl mx-auto">
+              {/* Create Post */}
+              <div className="mb-6">
+                <CreatePost />
               </div>
-              {currentUser && post.userId !== currentUser.uid && (
-                userFollowing.includes(post.userId) ? (
-                  <MotionButton
-                    whileTap={{ scale: 0.95 }}
-                    onClick={(e) => handleUnfollow(post.userId, e)}
-                    className="flex items-center space-x-2 rounded-full px-4 py-2 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 transition-all duration-200"
+
+            {/* Posts Feed */}
+            <div className="space-y-6">
+              <AnimatePresence>
+                {posts.map((post) => (
+                  <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200"
+                   
                   >
-                    <div><UserMinus className="h-5 w-5" /></div>
-                    <span>Unfollow</span>
-                  </MotionButton>
-                ) : (
-                  <MotionButton
-                    whileTap={{ scale: 0.95 }}
-                    onClick={(e) => handleFollow(post.userId, e)}
-                    className="flex items-center space-x-2 rounded-full px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 transition-all duration-200"
-                  >
-                    <div><UserPlus className="h-5 w-5" /></div>
-                    <span>Follow</span>
-                  </MotionButton>
-                )
+                    {/* Post Header */}
+                    <div onClick={() => handlePostClick(post.id)}>
+                    <PostHeader 
+                    post={post}
+                    currentUser = {currentUser}
+                    userFollowing = {userFollowing}
+                    onFollow={handleFollow}
+                    onUnfollow={handleUnfollow}
+                    />
+                    <PostContent content={post.content}/>
+                    </div>
+                    
+                    {/* Image Gallery */}
+                    <div className="px-4">
+                      <ImageGallery images={post.images || []} postId={post.id} />
+                    </div>
+
+                    {/* Post Actions */}
+                    <PostActions 
+                    post={post}
+                    currentUser={currentUser}
+                    onDislike={handleDislike}
+                    onShare={handleShare}
+                    onToggleComment={toggleCommentBox}/>
+
+                    {/* Comment Section */}
+                     <CommentSection 
+                      post={post}
+                      currentUser={currentUser}
+                      cachedUsers={cachedUsers}
+                      onCommentInputChange={(setPostId: string, value: string) => {
+                        setCommentInputs(prev => ({
+                          ...prev,
+                          [setPostId]: value
+                        }));
+                      }}
+                      onPostComment={handlePostComment}
+                      commentInput={commentInputs[post.id]}
+                      commentBoxStates={commentBoxStates}
+                     />         
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+
+              {/* Loading More Indicator */}
+              {loadingMore && (
+                <div className="flex justify-center py-8">
+                  <CustomLoader loading={loadingMore} size={30} color="#3b82f6" />
+                </div>
+              )}
+
+              {/* Load More Trigger */}
+              <div ref={observerTarget} className="h-10" />
+
+              {/* End of Feed Message */}
+              {!hasMore && posts.length > 0 && (
+                <div className="text-center py-8">
+                  <p className="text-gray-500 dark:text-gray-400">
+                    You&apos;ve reached the end of your feed...How jobless can you be -_-
+                  </p>
+                </div>
+              )}
+
+              {/* No Posts Message */}
+              {!loading && posts.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500 dark:text-gray-400 text-lg">
+                    No posts to display
+                  </p>
+                  <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
+                    Follow some users or create your first post!
+                  </p>
+                </div>
               )}
             </div>
-              
-            <div className="text-base text-gray-800 dark:text-foreground/90 leading-relaxed whitespace-pre-wrap rounded-lg bg-gray-50 dark:bg-accent/5">
-              {post.content}
-            </div>
-              
-            <div className="flex justify-between border-gray-200 dark:border-border/30">
-            <div className="flex items-center">
-
-           
-              <MotionButton
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => handleDislike(post.id, e)}
-                className={`flex items-center space-x-2 rounded-full px-4 py-2 transition-all duration-200 ${
-                  dislikedPosts.includes(post.id)
-                    ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400"
-                    : "hover:bg-red-50 dark:hover:bg-red-900/20 text-muted-foreground hover:text-red-600"
-                }`}
-              >
-                <div><ThumbsDown className={`h-5 w-5 ${dislikedPosts.includes(post.id) ? "text-red-600" : ""}`} /></div>
-                <span>{post.dislikes || 0}</span>
-              </MotionButton>
-
-              <MotionButton
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => toggleCommentBox(post.id, e)}
-                className={`flex items-center space-x-2 rounded-full px-4 py-2 transition-all duration-200 ${
-                  commentBoxStates[post.id]
-                    ? "bg-gray-100 dark:bg-gray-800/50 text-gray-900 dark:text-gray-100"
-                    : "hover:bg-gray-100 dark:hover:bg-gray-800 text-muted-foreground hover:text-gray-900 dark:hover:text-gray-100"
-                }`}
-              >
-                <div><MessageCircle className="h-5 w-5" /></div>
-                <span>{post.comments?.length || 0}</span>
-              </MotionButton>
-
-              </div>
-              <MotionButton
-                whileTap={{ scale: 0.95 }}
-                onClick={(e) => handleShare(post.id, e)}
-                className={`flex items-center space-x-2 rounded-full px-4 py-2 transition-all duration-200 hover:bg-purple-50 dark:hover:bg-purple-900/20 text-muted-foreground hover:text-purple-600`}
-              >
-                <div><Link2 className="h-5 w-5" /></div>
-                <span>{post.shares || 0}</span>
-              </MotionButton>              
-            </div>
-
-            {commentBoxStates[post.id] && (
-              <div onClick={(e) => e.stopPropagation()}>
-                <div className="flex space-x-2">
-                  <textarea
-                    value={commentInputs[post.id] || ""}
-                    onChange={(e) => setCommentInputs(prev => ({
-                      ...prev,
-                      [post.id]: e.target.value
-                    }))}
-                    placeholder="Write a comment..."
-                    className="flex-1 px-1 rounded-xl placeholder:p-2 border border-gray-200 dark:border-border bg-white dark:bg-background/50 backdrop-blur-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all duration-200"
-                  />
-                  <button
-                    onClick={(e) => handlePostComment(post.id, e)}
-                    className="px-4 bg-primary/90 text-primary-foreground rounded-xl hover:bg-primary transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={!commentInputs[post.id]?.trim()}
-                  >
-                    Post
-                  </button>
-                </div>
-
-                {post.comments && post.comments.length > 0 && (
-                  <div className="space-y-3 mt-4">
-                    {post.comments.map((comment: Comment, index: number) => (
-                      <div key={index} className="flex items-start space-x-3 p-2 rounded-xl bg-gray-50 dark:bg-accent/30 backdrop-blur-sm hover:bg-gray-100 dark:hover:bg-accent/40 transition-all duration-200">
-                        <div className="w-8 h-8 rounded-full overflow-hidden shadow-sm">
-                          <Image
-                            src={cachedUsers.get(comment.userId)?.profilepic || comment.profilePic || "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"}
-                            alt="Commenter avatar"
-                            width={32}
-                            height={32}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex gap-3 items-center">
-                            <p className="font-medium text-sm">{comment.userName || "Anonymous"}</p>
-                            <p className="text-xs text-muted-foreground">
-                            {formatRelativeTime(comment.timestamp)}
-                             </p>
-                          </div>
-                          <p className="text-sm text-foreground/90 mt-1">{comment.text}</p>
-                          
-                </div>
-              </div>
-            ))} 
           </div>
-        )}
+        </main>
+        <aside className="hidden lg:block fixed right-0 top-0 h-full w-80">
+      <RightSidebar />
+    </aside>
+       
       </div>
-    )}
-  </div>
-))}
-
-        {loadingMore && (
-          <div className="flex justify-center my-4">
-            <div><Loader loading={true} size={30} color="white" /></div>
-          </div>
-        )}
-
-        <div ref={observerTarget} style={{ height: "20px" }} />
-      </main>
-      
-      <aside className="lg:block">
-        <div><RightSidebar /></div>
-      </aside>
     </div>
   );
 }

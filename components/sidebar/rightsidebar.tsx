@@ -15,7 +15,7 @@ const FAILURE_CATEGORIES = [
 
 export function RightSidebar() {
   return (
-    <div className="hidden w-[16%] absolute right-0 top-16 h-[calc(100vh-70px)] bg-background dark:bg-background border-l border-border dark:border-border p-4 overflow-y-auto transition-colors md:block">
+<div className="hidden md:block fixed top-16 right-0 h-[calc(100vh-4rem)] w-full md:w-[18%] lg:w-[16%] bg-background border-l border-border p-4 overflow-y-auto transition-colors z-10">
       <div className="mb-6">
         <h3 className="font-semibold text-gray-900 dark:text-white mb-4">Trending Failures</h3>
         <div className="space-y-3">

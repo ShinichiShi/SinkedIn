@@ -10,6 +10,7 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { firebaseApp } from "@/lib/firebase";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { FaSailboat } from "react-icons/fa6";
 
 export function Navbar() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -50,7 +51,7 @@ export function Navbar() {
       <div className="container mx-auto px-4">
         <div className="flex h-16 items-center justify-between">
           <Link href="/" className="flex items-center space-x-2">
-            <Briefcase className="h-6 w-6 text-primary" />
+            <FaSailboat className="text-black dark:text-white w-6 h-6" />
             <span className="font-bold text-xl">SinkedIn</span>
           </Link>
 

@@ -12,32 +12,13 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "react-toastify";
-import { motion } from "framer-motion";
-import { MessageCircle, ThumbsDown, Link2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { MessageCircle, ThumbsDown, Link2, ArrowLeft, MoreHorizontal, Clock } from "lucide-react";
 import { LeftSidebar } from "@/components/sidebar/leftsidebar";
+import { formatRelativeTime as formatTime } from "@/utils/timeUtils";
 import { RightSidebar } from "@/components/sidebar/rightsidebar";
+import { Comment,Post } from "@/types";
 
-// TypeScript interfaces
-interface Comment {
-  userId: string;
-  text: string;
-  userName: string;
-  profilePic: string;
-  timestamp: any; // Firebase Timestamp or Date
-}
-
-interface Post {
-  id: string;
-  userId: string;
-  content: string;
-  userName?: string;
-  userProfilePic?: string;
-  timestamp?: any; // Firebase Timestamp
-  dislikes?: number;
-  dislikedBy?: string[];
-  shares?: number;
-  comments?: Comment[];
-}
 
 interface UserData {
   username: string;
@@ -52,6 +33,19 @@ const PostPage = () => {
   const [dislikedPosts, setDislikedPosts] = useState<string[]>([]);
   const [commentInput, setCommentInput] = useState<string>("");
   const [cachedUsers, setCachedUsers] = useState<Map<string, UserData>>(new Map());
+  const [showComments, setShowComments] = useState(true);
+  const [currentUserData, setCurrentUserData] = useState<UserData | null>(null);
+
+  // Function to get default profile picture with first letter of username
+  const getDefaultProfilePic = (username: string) => {
+    const firstLetter = username?.charAt(0)?.toUpperCase() || 'A';
+    return `data:image/svg+xml;base64,${btoa(`
+      <svg width="40" height="40" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+        <rect width="40" height="40" fill="#3b82f6" rx="20"/>
+        <text x="20" y="25" text-anchor="middle" fill="white" font-family="Arial, sans-serif" font-size="16" font-weight="bold">${firstLetter}</text>
+      </svg>
+    `)}`;
+  };
 
   // Function to fetch user data and cache it
   const fetchUserData = async (userIds: string[]) => {
@@ -85,6 +79,44 @@ const PostPage = () => {
     return currentUserCache;
   };
 
+  // Function to fetch current user data
+  const fetchCurrentUserData = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) return;
+
+    // Check if current user data is already cached
+    if (cachedUsers.has(currentUser.uid)) {
+      setCurrentUserData(cachedUsers.get(currentUser.uid) || null);
+      return;
+    }
+
+    try {
+      const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+      if (userDoc.exists()) {
+        const userData = userDoc.data() as UserData;
+        setCurrentUserData(userData);
+        
+        // Add to cache
+        setCachedUsers(prev => new Map(prev).set(currentUser.uid, userData));
+      } else {
+        // Fallback to auth user data if no document exists
+        const fallbackUserData: UserData = {
+          username: currentUser.displayName || "Anonymous",
+          profilepic: ""
+        };
+        setCurrentUserData(fallbackUserData);
+      }
+    } catch (error) {
+      console.error("Error fetching current user data:", error);
+      // Fallback to auth user data
+      const fallbackUserData: UserData = {
+        username: currentUser?.displayName || "Anonymous",
+        profilepic: ""
+      };
+      setCurrentUserData(fallbackUserData);
+    }
+  };
+
   useEffect(() => {
     if (!id) return;
 
@@ -105,6 +137,12 @@ const PostPage = () => {
                 userIds.push(comment.userId);
               }
             });
+          }
+
+          // Add current user to the list if authenticated
+          const currentUser = auth.currentUser;
+          if (currentUser && !userIds.includes(currentUser.uid)) {
+            userIds.push(currentUser.uid);
           }
 
           // Fetch user data for all users
@@ -132,6 +170,9 @@ const PostPage = () => {
           }
 
           setPost(updatedPost);
+          
+          // Fetch current user data for comment input
+          await fetchCurrentUserData();
         } else {
           console.error("Post not found");
           router.push("/404");
@@ -145,6 +186,11 @@ const PostPage = () => {
 
     fetchPost();
   }, [id, router]);
+
+  useEffect(() => {
+    // Fetch current user data when auth state changes
+    fetchCurrentUserData();
+  }, [cachedUsers]);
 
   const handleDislike = async (postId: string) => {
     if (!post) return;
@@ -223,11 +269,10 @@ const PostPage = () => {
     }
   };
 
-  const toggleCommentBox = (postId: string) => {
-    // This function can be used to toggle comment visibility if needed
-    console.log("Toggle comment box for post:", postId);
+  const toggleCommentBox = () => {
+    setShowComments(!showComments);
   };
-
+  
   const handlePostComment = async () => {
     if (!post) return;
 
@@ -247,14 +292,14 @@ const PostPage = () => {
       const postRef = doc(db, "posts", post.id);
       
       // Get current user data for the comment
-      const currentUserData = cachedUsers.get(currentUser.uid);
+      const currentUserInfo = cachedUsers.get(currentUser.uid);
       let userName = currentUser.displayName || "Anonymous";
       let profilePic = "";
 
       // If user data is cached, use it; otherwise fetch it
-      if (currentUserData) {
-        userName = currentUserData.username || userName;
-        profilePic = currentUserData.profilepic || "";
+      if (currentUserInfo) {
+        userName = currentUserInfo.username || userName;
+        profilePic = currentUserInfo.profilepic || "";
       } else {
         // Fetch current user data if not in cache
         const userDoc = await getDoc(doc(db, "users", currentUser.uid));
@@ -265,6 +310,7 @@ const PostPage = () => {
           
           // Add to cache
           setCachedUsers(prev => new Map(prev).set(currentUser.uid, userData));
+          setCurrentUserData(userData);
         }
       }
 
@@ -298,136 +344,280 @@ const PostPage = () => {
 
   if (loading) {
     return (
-      <div className="flex h-screen justify-center items-center">
-        <HashLoader size={50} color="#ffffff" />
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
+        <HashLoader size={50} color="#3b82f6" />
       </div>
     );
   }
 
   if (!post) {
-    return <p>Post not found.</p>;
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Post not found</h1>
+          <Button onClick={() => router.push("/feed")} className="flex items-center gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Feed
+          </Button>
+        </div>
+      </div>
+    );
   }
 
+  // Get current user profile picture for comment input
+  const getCurrentUserProfilePic = () => {
+    if (currentUserData?.profilepic) {
+      return currentUserData.profilepic;
+    }
+    
+    const username = currentUserData?.username || auth.currentUser?.displayName || "Anonymous";
+    return getDefaultProfilePic(username);
+  };
+
   return (
-    <div className="p-4">
-      <LeftSidebar/>
-      <div className="w-full max-w-2xl mx-auto">
-        <Card className="p-4 mb-4">
-          <div className="flex gap-4">
-            <Link href={`/profile/${post.userId}`}>
-            <Avatar className="w-12 h-12">
-              <Image
-                src={
-                  post.userProfilePic ||
-                  "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"
-                }
-                height={48}
-                width={48}
-                alt={`${post.userName || "Anonymous"}'s avatar`}
-                className="rounded-full"
-              />
-            </Avatar>
-            <div className="flex-1">
-              <p className="font-bold">{post.userName || "Anonymous"}</p>
-              <p className="text-sm text-gray-600">
-                {post.timestamp
-                  ? new Date(post.timestamp.seconds * 1000).toLocaleString()
-                  : "No timestamp available"}
-              </p>
-              <p className="mt-2">{post.content}</p>
-            </div>
-            </Link>
-          </div>
-          <hr className="my-4 border-secondary" /> 
-          <div className="flex justify-around text-sm text-gray-500">
-            <motion.div whileTap={{ scale: 0.9 }}>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleDislike(post.id)}
-                className="flex items-center gap-2"
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="flex max-w-7xl mx-auto">
+        {/* Left Sidebar */}
+        <aside className="hidden lg:block w-64">
+          <LeftSidebar />
+        </aside>
+        
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto max-h-[calc(100vh-120px)] no-scrollbar px-4 py-6 lg:mr-80">
+          <div className="max-w-2xl mx-auto">
+            {/* Back Button */}
+            <div className="mb-6">
+              <Button 
+                variant="ghost" 
+                onClick={() => router.back()}
+                className="flex items-center gap-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
               >
-                <ThumbsDown
-                  className={`h-4 w-4 ${
-                    dislikedPosts.includes(post.id)
-                      ? "text-red-500"
-                      : "text-muted-foreground"
-                  }`}
-                />
-                {post.dislikes || 0} Dislike
+                <ArrowLeft className="h-4 w-4" />
+                Back
               </Button>
-            </motion.div>
+            </div>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => toggleCommentBox(post.id)}
-              className="flex items-center gap-2"
+            {/* Main Post Card */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-6"
             >
-              <MessageCircle className="h-4 w-4" />
-              Comment
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleShare(post.id)}
-              className="flex items-center gap-2"
-            >
-              <Link2 className="h-4 w-4" />
-              {post.shares || 0} Shares
-            </Button>
-          </div>
-        </Card>
-
-        <Card className="p-4">
-          <h3 className="text-lg font-semibold mb-2">Comments</h3>
-          {post.comments && post.comments.length > 0 ? (
-            <div className="space-y-4">
-              {post.comments.map((comment: Comment, index: number) => (
-                <div key={index} className="flex gap-4">
-                  <Avatar className="w-10 h-10">
-                    <Image
-                      src={
-                        comment.profilePic ||
-                        "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"
-                      }
-                      height={40}
-                      width={40}
-                      alt={`${comment.userName || "Anonymous"}'s avatar`}
-                      className="rounded-full"
-                    />
-                  </Avatar>
-                  <div>
-                    <p className="font-bold">{comment.userName || "Anonymous"}</p>
-                    <p className="text-sm text-gray-600">
-                      {comment.timestamp && comment.timestamp.seconds 
-                        ? new Date(comment.timestamp.seconds * 1000).toLocaleString()
-                        : comment.timestamp 
-                        ? new Date(comment.timestamp).toLocaleString()
-                        : "No timestamp"}
-                    </p>
-                    <p className="mt-1">{comment.text}</p>
+              {/* Post Header */}
+              <div className="p-2 px-3 pb-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3">
+                    <Link href={`/profile/${post.userId}`}>
+                      <Avatar className="w-12 h-12 ring-2 ring-gray-100 dark:ring-gray-700">
+                        <Image
+                          src={
+                            post.userProfilePic ||
+                            getDefaultProfilePic(post.userName || "Anonymous")
+                          }
+                          height={48}
+                          width={48}
+                          alt={`${post.userName || "Anonymous"}'s avatar`}
+                          className="rounded-full object-cover"
+                        />
+                      </Avatar>
+                    </Link>
+                    <div>
+                      <Link href={`/profile/${post.userId}`}>
+                        <h3 className="font-semibold text-gray-900 dark:text-white hover:underline">
+                          {post.userName || "Anonymous"}
+                        </h3>
+                      </Link>
+                      <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                        <Clock className="h-3 w-3" />
+                        {formatTime(post.timestamp)}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-gray-500">No comments yet.</p>
-          )}
+              </div>
 
-          <div className="mt-4">
-            <Textarea
-              value={commentInput}
-              onChange={(e) => setCommentInput(e.target.value)}
-              placeholder="Add a comment..."
-            />
-            <Button onClick={handlePostComment} className="mt-2">
-              Post Comment
-            </Button>
+              {/* Post Content */}
+              <div className="px-3 pb-2">
+                <p className="text-gray-900 dark:text-white text-lg leading-relaxed whitespace-pre-wrap">
+                  {post.content}
+                </p>
+              </div>
+
+              {/* Image Gallery */}
+              {post.images && post.images.length > 0 && (
+                <div className="px-6 pb-2">
+                  <div className={`grid gap-2 ${
+                    post.images.length === 1 ? 'grid-cols-1' : 
+                    post.images.length === 2 ? 'grid-cols-2' : 
+                    'grid-cols-2'
+                  }`}>
+                    {post.images.map((image, index) => (
+                      <div key={index} className="relative aspect-square overflow-hidden rounded-lg">
+                        <Image
+                          src={image}
+                          alt={`Post image ${index + 1}`}
+                          fill
+                          className="object-cover hover:scale-105 transition-transform duration-200"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Post Actions */}
+              <div className="px-6 py-2 border-t">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <motion.div whileTap={{ scale: 0.95 }}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDislike(post.id)}
+                        className={`flex items-center gap-2 ${
+                          dislikedPosts.includes(post.id)
+                            ? "text-red-500 hover:text-red-600"
+                            : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                        }`}
+                      >
+                        <ThumbsDown className="h-4 w-4" />
+                        <span className="text-sm font-medium">{post.dislikes || 0}</span>
+                      </Button>
+                    </motion.div>
+
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={toggleCommentBox}
+                      className="flex items-center gap-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      <span className="text-sm font-medium">
+                        {post.comments?.length || 0} Comments
+                      </span>
+                    </Button>
+
+                    <motion.div whileTap={{ scale: 0.95 }}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleShare(post.id)}
+                        className="flex items-center gap-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                      >
+                        <Link2 className="h-4 w-4" />
+                        <span className="text-sm font-medium">{post.shares || 0}</span>
+                      </Button>
+                    </motion.div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* Comments Section */}
+            <AnimatePresence>
+              {showComments && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden"
+                >
+                  <div className="p-3">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                      Comments ({post.comments?.length || 0})
+                    </h3>
+
+                    {/* Add Comment */}
+                    <div className="mb-6">
+                      <div className="flex gap-3">
+                        <Avatar className="w-10 h-10 ring-2 ring-gray-100 dark:ring-gray-700">
+                          <Image
+                            src={getCurrentUserProfilePic()}
+                            height={40}
+                            width={40}
+                            alt="Your avatar"
+                            className="rounded-full object-cover"
+                          />
+                        </Avatar>
+                        <div className="flex-1">
+                          <Textarea
+                            value={commentInput}
+                            onChange={(e) => setCommentInput(e.target.value)}
+                            placeholder="Write a comment..."
+                            className="min-h-[80px] border-gray-200 dark:border-gray-600 focus:border-blue-500 dark:focus:border-blue-400"
+                          />
+                          <div className="flex justify-end mt-2">
+                            <Button 
+                              onClick={handlePostComment}
+                              disabled={!commentInput.trim()}
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
+                            >
+                              Post
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Comments List */}
+                    {post.comments && post.comments.length > 0 ? (
+                      <div className="space-y-4">
+                        {post.comments.map((comment: Comment, index: number) => (
+                          <motion.div
+                            key={index}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.1 }}
+                            className="flex gap-3 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg"
+                          >
+                            <Avatar className="w-10 h-10 ring-2 ring-gray-100 dark:ring-gray-600">
+                              <Image
+                                src={
+                                  comment.profilePic ||
+                                  getDefaultProfilePic(comment.userName || "Anonymous")
+                                }
+                                height={40}
+                                width={40}
+                                alt={`${comment.userName || "Anonymous"}'s avatar`}
+                                className="rounded-full object-cover"
+                              />
+                            </Avatar>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-semibold text-gray-900 dark:text-white">
+                                  {comment.userName || "Anonymous"}
+                                </h4>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  {formatTime(comment.timestamp)}
+                                </span>
+                              </div>
+                              <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                                {comment.text}
+                              </p>
+                            </div>
+                          </motion.div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <MessageCircle className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                        <p className="text-gray-500 dark:text-gray-400">
+                          No comments yet. Be the first to comment!
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
-        </Card>
+        </main>
+
+        {/* Right Sidebar */}
+        <aside className="hidden lg:block fixed right-0 top-0 h-full w-80">
+          <RightSidebar />
+        </aside>
       </div>
-      <RightSidebar/>
     </div>
   );
 };

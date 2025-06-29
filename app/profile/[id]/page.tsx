@@ -1,44 +1,38 @@
 "use client";
 
-import { useState, useEffect, useCallback, JSX } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { motion, AnimatePresence } from "framer-motion";
-import { ThumbsDown, MessageCircle, Share, Edit, LogOut, MapPin } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { doc, getDoc, collection, query, getDocs, updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+import { Pencil, LogOut, MapPin, Calendar, Award, AlertTriangle, BookOpen } from "lucide-react";
+
+import { 
+  doc, 
+  getDoc, 
+  collection, 
+  query, 
+  getDocs, 
+  updateDoc, 
+  arrayUnion, 
+  arrayRemove, 
+  increment 
+} from "firebase/firestore";
+import Image from "next/image";
+import { UserPlus, UserMinus } from "lucide-react";
 import { getAuth } from "firebase/auth";
 import { firebaseApp, db } from "@/lib/firebase";
 import { toast } from "react-toastify";
 import { UserListItem } from "@/components/profile/user-list-item";
+import { UserData, Post } from "@/types/index";
+import CommentSection from "@/components/post/CommentSection";
+import PostActions from "@/components/post/PostActions";
+import ImageGallery from "@/components/post/ImageGallery";
+import PostContent from "@/components/post/PostContent";
+import { formatRelativeTime } from "@/utils/timeUtils";
+import Hero from "@/components/profile/Hero";
 
-interface UserData {
-  username: string;
-  email: string;
-  location?: string;
-  bio?: string;
-  profilepic?: string;
-  backgroundImage?: string;
-  failedExperience?: string[];
-  misEducation?: string[];
-  failureHighlights?: string[];
-  followers: string[];
-  following: string[];
-}
+const MotionButton = motion.button;
 
-interface Post {
-  id: string;
-  title: string;
-  content: string;
-  userId: string;
-  timestamp: any;
-  dislikes?: number;
-  comments?: any[];
-  shares?: number;
-}
-
-export default function UserProfile(): JSX.Element {
+export default function UserProfile() {
   const params = useParams();
   const router = useRouter();
   const userId = params.id as string;
@@ -47,24 +41,38 @@ export default function UserProfile(): JSX.Element {
   const [userData, setUserData] = useState<UserData | null>(null);
   const [currentUserData, setCurrentUserData] = useState<UserData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [commentBoxStates, setCommentBoxStates] = useState<{[key: string]: boolean}>({});
   const [posts, setPosts] = useState<Post[]>([]);
-  const [isOwnProfile, setIsOwnProfile] = useState(false);
+  const [cachedUsers, setCachedUsers] = useState<Map<string, any>>(new Map());
+  const [commentInputs, setCommentInputs] = useState<{[key: string]: string}>({});
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [dislikedPosts, setDislikedPosts] = useState<string[]>([]);
+  const [userFollowing, setUserFollowing] = useState<string[]>([]);
+  const [isFollowing, setIsFollowing] = useState(false);
+
+  const auth = getAuth(firebaseApp);
+
+  const toggleCommentBox = (postId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setCommentBoxStates((prev) => ({
+      ...prev,
+      [postId]: !prev[postId],
+    }));
+  };
 
   const fetchUserData = useCallback(async () => {
     if (!userId) return;
 
-    const auth = getAuth(firebaseApp);
-    const currentUser = auth.currentUser;
+    const user = auth.currentUser;
     
-    if (!currentUser) {
+    if (!user) {
       router.push("/login");
       return;
     }
 
-    try {
-      // Check if this is the user's own profile
-      setIsOwnProfile(currentUser.uid === userId);
+    setCurrentUser(user);
 
+    try {
       // Fetch the profile user's data
       const userDoc = doc(db, "users", userId);
       const docSnap = await getDoc(userDoc);
@@ -78,11 +86,14 @@ export default function UserProfile(): JSX.Element {
         return;
       }
 
-      // Fetch current user's data
-      const currentUserDoc = doc(db, "users", currentUser.uid);
+      // Fetch current user's data to check following status
+      const currentUserDoc = doc(db, "users", user.uid);
       const currentUserSnap = await getDoc(currentUserDoc);
       if (currentUserSnap.exists()) {
-        setCurrentUserData(currentUserSnap.data() as UserData);
+        const currentUserData = currentUserSnap.data() as UserData;
+        setCurrentUserData(currentUserData);
+        setUserFollowing(currentUserData.following || []);
+        setIsFollowing((currentUserData.following || []).includes(userId));
       }
 
       // Fetch user's posts
@@ -103,240 +114,587 @@ export default function UserProfile(): JSX.Element {
     } finally {
       setLoading(false);
     }
-  }, [userId, router]);
+  }, [userId, router, auth]);
 
   useEffect(() => {
     fetchUserData();
   }, [fetchUserData]);
 
-  const handleLogout = async () => {
-    const auth = getAuth(firebaseApp);
-    try {
-      await auth.signOut();
+  const handlePostClick = (postId: string) => {
+    router.push(`/post/${postId}`);
+  };
+
+  const handleFollow = async (targetUserId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!currentUser) {
+      toast.error("Please log in to follow users");
       router.push("/login");
-      toast.success("Logged out successfully");
+      return;
+    }
+
+    try {
+      // Update current user's following list
+      const currentUserRef = doc(db, "users", currentUser.uid);
+      await updateDoc(currentUserRef, {
+        following: arrayUnion(targetUserId)
+      });
+
+      // Update target user's followers list
+      const targetUserRef = doc(db, "users", targetUserId);
+      await updateDoc(targetUserRef, {
+        followers: arrayUnion(currentUser.uid)
+      });
+
+      // Update local state
+      setUserFollowing(prev => [...prev, targetUserId]);
+      setIsFollowing(true);
+      
+      // Update userData followers count locally
+      setUserData(prev => prev ? {
+        ...prev,
+        followers: [...(prev.followers || []), currentUser.uid]
+      } : prev);
+      
+      toast.success("Successfully followed user!");
     } catch (error) {
-      console.error("Error logging out:", error);
-      toast.error("Failed to log out");
+      console.error("Error following user:", error);
+      toast.error("Failed to follow user");
     }
   };
 
-  const handleEdit = () => {
-    router.push("/profile/edit");
+  const handleUnfollow = async (targetUserId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    if (!currentUser) {
+      toast.error("Please log in to unfollow users");
+      router.push("/login");
+      return;
+    }
+
+    try {
+      // Update current user's following list
+      const currentUserRef = doc(db, "users", currentUser.uid);
+      await updateDoc(currentUserRef, {
+        following: arrayRemove(targetUserId)
+      });
+
+      // Update target user's followers list
+      const targetUserRef = doc(db, "users", targetUserId);
+      await updateDoc(targetUserRef, {
+        followers: arrayRemove(currentUser.uid)
+      });
+
+      // Update local state
+      setUserFollowing(prev => prev.filter(id => id !== targetUserId));
+      setIsFollowing(false);
+      
+      // Update userData followers count locally
+      setUserData(prev => prev ? {
+        ...prev,
+        followers: (prev.followers || []).filter(id => id !== currentUser.uid)
+      } : prev);
+      
+      toast.success("Successfully unfollowed user!");
+    } catch (error) {
+      console.error("Error unfollowing user:", error);
+      toast.error("Failed to unfollow user");
+    }
+  };
+
+  const handleDislike = async (postId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      if (!currentUser) {
+        toast.error("You need to be logged in to dislike a post.");
+        return;
+      }
+
+      const postRef = doc(db, "posts", postId);
+      const postIndex = posts.findIndex((post) => post.id === postId);
+      const post = posts[postIndex];
+      const userId = currentUser.uid;
+      const hasDisliked = post.dislikedBy?.includes(userId);
+
+      if (hasDisliked) {
+        const updatedDislikedBy = post.dislikedBy.filter((id: string) => id !== userId);
+        await updateDoc(postRef, {
+          dislikes: Math.max((post.dislikes || 0) - 1, 0),
+          dislikedBy: updatedDislikedBy,
+        });
+
+        setPosts((prevPosts) =>
+          prevPosts.map((p) =>
+            p.id === postId ? {
+              ...p,
+              dislikes: Math.max((p.dislikes || 0) - 1, 0),
+              dislikedBy: updatedDislikedBy,
+            } : p
+          )
+        );
+        setDislikedPosts(dislikedPosts.filter((id) => id !== postId));
+      } else {
+        const updatedDislikedBy = [...(post.dislikedBy || []), userId];
+        await updateDoc(postRef, {
+          dislikes: (post.dislikes || 0) + 1,
+          dislikedBy: updatedDislikedBy,
+        });
+
+        setPosts((prevPosts) =>
+          prevPosts.map((p) =>
+            p.id === postId ? {
+              ...p,
+              dislikes: (p.dislikes || 0) + 1,
+              dislikedBy: updatedDislikedBy,
+            } : p
+          )
+        );
+        setDislikedPosts([...dislikedPosts, postId]);
+      }
+    } catch (error) {
+      console.error("Error updating dislikes:", error);
+      toast.error("Failed to update dislike.");
+    }
+  };
+
+  const handlePostComment = async (postId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      if (!currentUser) {
+        toast.error("Please log in to comment");
+        return;
+      }
+
+      const commentText = commentInputs[postId];
+      if (!commentText?.trim()) {
+        toast.error("Comment cannot be empty");
+        return;
+      }
+
+      const postRef = doc(db, "posts", postId);
+      const postIndex = posts.findIndex((post) => post.id === postId);
+      const post = posts[postIndex];
+
+      let userProfilePic = cachedUsers.get(currentUser.uid)?.profilepic;
+      if (!userProfilePic) {
+        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          userProfilePic = userData.profilepic;
+          setCachedUsers(prev => new Map(prev).set(currentUser.uid, userData));
+        }
+      }
+
+      const newComment = {
+        userId: currentUser.uid,
+        userName: currentUser.displayName || "Anonymous",
+        text: commentText,
+        profilePic: userProfilePic || null,
+        timestamp: new Date()
+      };
+
+      const updatedComments = [...(post.comments || []), newComment];
+      
+      await updateDoc(postRef, {
+        comments: updatedComments,
+      });
+
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.id === postId ? { ...p, comments: updatedComments } : p
+        )
+      );
+
+      setCommentInputs((prev) => ({
+        ...prev,
+        [postId]: "",
+      }));
+
+      toast.success("Comment added successfully!");
+    } catch (error) {
+      console.error("Error adding comment:", error);
+      toast.error("Failed to add comment");
+    }
+  };
+
+  const handleShare = async (postId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    try {
+      const postRef = doc(db, "posts", postId);
+      await updateDoc(postRef, {
+        shares: increment(1),
+      });
+
+      setPosts((prevPosts) =>
+        prevPosts.map((p) =>
+          p.id === postId ? { ...p, shares: (p.shares || 0) + 1 } : p
+        )
+      );
+
+      const shareUrl = `${window.location.origin}/post/${postId}`;
+      if (navigator.share) {
+        await navigator.share({
+          title: "Check out this post!",
+          url: shareUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success("Post link copied to clipboard!");
+      }
+    } catch (error) {
+      console.error("Error sharing post:", error);
+      toast.error("Failed to share post.");
+    }
+  };
+
+  const getTabClassName = (tab: 'posts' | 'followers' | 'following') => {
+    return `${
+      activeTab === tab
+        ? 'border-b-2 border-white text-white'
+        : 'text-gray-400 hover:text-white border-b-2 border-transparent hover:border-gray-600'
+    } px-3 sm:px-6 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-all cursor-pointer`;
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
-        <div className="animate-spin text-primary">Loading...</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
 
   if (!userData) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2 text-white">User Not Found</h1>
-          <p className="text-muted-foreground mb-4">The user you're looking for doesn't exist.</p>
-          <Button onClick={() => router.push("/")}>Go Home</Button>
+          <p className="text-gray-400 mb-4">The user you&apos;re looking for doesn&apos;t exist.</p>
+          <button 
+            onClick={() => router.push("/")}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            Go Home
+          </button>
         </div>
       </div>
     );
   }
 
-  const getTabClassName = (tab: 'posts' | 'followers' | 'following') => {
-    return cn(
-      'px-6 py-3 text-sm font-medium transition-all cursor-pointer',
-      activeTab === tab
-        ? 'border-b-2 border-white text-white'
-        : 'text-gray-400 hover:text-white border-b-2 border-transparent hover:border-gray-600'
-    );
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-purple-800">
-      {/* Header Section */}
-      <div className="bg-gradient-to-br from-blue-900 via-purple-900 to-purple-800 px-8 py-12">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex items-center gap-6">
-            {/* Profile Image */}
-            <div className="w-32 h-32 rounded-full overflow-hidden border-4 border-white/20 shadow-xl">
-              {userData?.profilepic ? (
-                <img 
-                  src={userData.profilepic} 
-                  alt={userData.username || "Profile"}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-4xl font-bold bg-slate-700 text-white">
-                  {userData?.username?.[0]?.toUpperCase()}
-                </div>
-              )}
-            </div>
-
-            {/* Profile Info */}
-            <div className="flex-1">
-              <h1 className="text-4xl font-bold text-white mb-2">
-                {userData?.username?.toUpperCase()}
-              </h1>
-              <p className="text-gray-200 text-lg mb-4">
-                {userData?.bio || "Embracing failures as stepping stones to success"}
-              </p>
-              
-              {/* Stats */}
-              <div className="flex items-center gap-6 text-gray-200">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-red-400" />
-                  <span>{userData?.location || "Unknown"}</span>
-                </div>
-                <div className="text-sm">
-                  <span className="font-medium">{userData?.followers?.length || 0}</span> Followers
-                </div>
-                <div className="text-sm">
-                  <span className="font-medium">{userData?.following?.length || 0}</span> Following
-                </div>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            {isOwnProfile && (
-              <div className="flex gap-3">
-                <Button
-                  onClick={handleEdit}
-                  variant="outline"
-                  className="gap-2 bg-transparent border-white/30 text-white hover:bg-white/10"
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Hero Section - Modified to show follow button for non-own profiles */}
+     <div className="w-full">
+           {/* Hero Section */}
+           <div className="relative w-full min-h-[300px] sm:h-80 overflow-hidden">
+             {/* Background Image or Gradient */}
+             
+             <div 
+               className="absolute inset-0"
+               style={{
+                 backgroundImage: userData?.backgroundImage 
+                   ? `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url(${userData.backgroundImage})`
+                   : 'linear-gradient(135deg, #1e3a8a 0%, #3730a3 50%, #581c87 100%)',
+                 backgroundSize: 'cover',
+                 backgroundPosition: 'center',
+               }}
+             />
+             
+             {/* Profile Content - Unified Layout */}
+            <div className="absolute justify-end p-5 sm:top-30 left-0 right-0 bottom-0 flex flex-col">
+          <div className="flex flex-col justify-center sm:flex-row items-center sm:items-end sm:justify-center gap-4 sm:gap-6">
+            {/* Profile Picture */}
+            <div className="relative shrink-0">
+                   <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-gray-200">
+                     {userData?.profilepic ? (
+                       <Image
+                         src={userData.profilepic}
+                         alt={userData.username || "Profile"}
+                         fill
+                         className="object-cover rounded-full"
+                         sizes="(max-width: 640px) 96px, 128px"
+                         priority
+                       />
+                     ) : (
+                       <div className="w-full h-full flex items-center justify-center text-2xl sm:text-4xl font-bold text-gray-600 bg-gray-100 rounded-full">
+                         {userData?.username?.[0]?.toUpperCase() || "?"}
+                       </div>
+                     )}
+                   </div>
+                 </div>
+     
+                 {/* Profile Info */}
+                         <div className="flex-1 text-center sm:text-left sm:pb-4">
+                           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+                             {/* User Details */}
+                             <div className="space-y-2 sm:space-y-3">
+                               <h1 className="text-2xl sm:text-4xl font-bold text-white">
+                                 {userData?.username || 'Unknown User'}
+                               </h1>
+                               
+                               {userData?.bio && (
+                                 <p className="text-gray-200 text-sm sm:text-lg px-2 sm:px-0 max-w-md sm:mx-0 mx-auto">
+                                   {userData.bio}
+                                 </p>
+                               )}
+                               
+                               {/* Stats and Location */}
+                               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-6">
+                                 {userData?.location && (
+                                   <div className="flex items-center gap-1 text-gray-300 text-sm sm:text-base">
+                                     <MapPin className="h-4 w-4" />
+                                     <span>{userData.location}</span>
+                                   </div>
+                                 )}
+                                 
+                                 <div className="flex items-center gap-4 text-xs sm:text-sm text-gray-300">
+                                   <span className="font-medium">
+                                     {userData?.followers?.length || 0} Followers
+                                   </span>
+                                   <span className="font-medium">
+                                     {userData?.following?.length || 0} Following
+                                   </span>
+                                 </div>
+                               </div>
+                       
+                        
+                     </div>
+     
+                       {currentUser && currentUser.uid !== userId && (
+              <div className="flex-shrink-0 self-center">
+                <MotionButton
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={(e) => 
+                    isFollowing 
+                      ? handleUnfollow(userId, e)
+                      : handleFollow(userId, e)
+                  }
+                  className={`px-6 py-3 rounded-full text-sm font-medium transition-colors duration-200 flex items-center gap-2 ${
+                    isFollowing
+                      ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                      : 'bg-blue-500 text-white hover:bg-blue-600'
+                  }`}
                 >
-                  <Edit className="w-4 h-4" />
-                  Edit
-                </Button>
-                <Button
-                  onClick={handleLogout}
-                  className="gap-2 bg-red-600 hover:bg-red-700 text-white border-0"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </Button>
+                  {isFollowing ? (
+                    <>
+                      <UserMinus size={16} />
+                      Unfollow
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus size={16} />
+                      Follow
+                    </>
+                  )}
+                </MotionButton>
               </div>
             )}
-          </div>
-        </div>
-      </div>
-
-      {/* Navigation Tabs */}
-      <div className="border-b border-gray-700 bg-slate-800">
-        <div className="max-w-6xl mx-auto px-8">
-          <div className="flex">
-            <button
-              onClick={() => setActiveTab('posts')}
-              className={getTabClassName('posts')}
-            >
-              Posts
-            </button>
-            <button
-              onClick={() => setActiveTab('followers')}
-              className={getTabClassName('followers')}
-            >
-              Followers ({userData?.followers?.length || 0})
-            </button>
-            <button
-              onClick={() => setActiveTab('following')}
-              className={getTabClassName('following')}
-            >
-              Following ({userData?.following?.length || 0})
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      <div className="bg-slate-900 min-h-screen">
-        <div className="max-w-6xl mx-auto px-8 py-6">
-          {activeTab === 'posts' && (
-            <div className="space-y-6">
-              {posts.map((post) => (
-                <Card
-                  key={post.id}
-                  onClick={() => router.push(`/post/${post.id}`)}
-                  className="bg-slate-800 border-slate-700 hover:bg-slate-700/50 transition-all duration-300 cursor-pointer"
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-4 mb-4">
-                      <div className="w-12 h-12 rounded-full overflow-hidden">
-                        {userData?.profilepic ? (
-                          <img
-                            src={userData.profilepic}
-                            alt={userData.username || "Profile"}
-                            className="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-xl font-bold bg-slate-700 text-white">
-                            {userData?.username?.[0]?.toUpperCase()}
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-lg text-white">
-                          {userData?.username || "Anonymous"}
-                        </h3>
-                        <p className="text-sm text-gray-400">
-                          {post.timestamp ? new Date(post.timestamp.toDate()).toLocaleString() : ""}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="text-gray-200 leading-relaxed mb-4">
-                      {post.content}
-                    </div>
-
-                    <div className="flex justify-between items-center pt-4 border-t border-slate-700">
-                      <div className="flex items-center space-x-2 text-gray-400">
-                        <ThumbsDown className="h-5 w-5" />
-                        <span>{post.dislikes || 0}</span>
-                      </div>
-                      <div className="flex items-center space-x-2 text-gray-400">
-                        <MessageCircle className="h-5 w-5" />
-                        <span>{post.comments?.length || 0}</span>
-                      </div>
-                      <div className="flex items-center space-x-2 text-gray-400">
-                        <Share className="h-5 w-5" />
-                        <span>{post.shares || 0}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-              {posts.length === 0 && (
-                <div className="text-center text-gray-400 py-12">
-                  {userData.username} hasn&apos;t shared any failure stories yet.
-                </div>
-              )}
+                   </div>
+                 </div>
+               </div>
+             </div>
+           </div>
+     
+          
+         </div>
+         
+      {/* Tabs and Content */}
+      <div className="bg-slate-900">
+        {/* Tabs */}
+        <div className="border-b border-gray-700">
+          <div className="container max-w-6xl mx-auto px-4 sm:px-8">
+            <div className="flex overflow-x-auto">
+              <button
+                onClick={() => setActiveTab('posts')}
+                className={getTabClassName('posts')}
+              >
+                Posts
+              </button>
+              <button
+                onClick={() => setActiveTab('followers')}
+                className={getTabClassName('followers')}
+              >
+                <span className="hidden sm:inline">Followers </span>
+                <span className="sm:hidden">Followers </span>
+                ({userData?.followers?.length || 0})
+              </button>
+              <button
+                onClick={() => setActiveTab('following')}
+                className={getTabClassName('following')}
+              >
+                <span className="hidden sm:inline">Following </span>
+                <span className="sm:hidden">Following </span>
+                ({userData?.following?.length || 0})
+              </button>
             </div>
-          )}
+          </div>
+        </div>
 
+        {/* Content Section */}
+        <div className="container max-w-6xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
           {activeTab === 'followers' && (
-            <div className="grid gap-4">
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
               {(userData?.followers ?? []).map((followerId) => (
-                <UserListItem key={followerId} userId={followerId} />
+                <div
+                  key={followerId}
+                  className="transform transition-all duration-300 hover:scale-105"
+                >
+                  <UserListItem userId={followerId} />
+                </div>
               ))}
               {!userData?.followers?.length && (
-                <div className="text-center text-muted-foreground">
-                  {userData.username} has no followers yet.
+                <div className="col-span-full text-center py-8 sm:py-12">
+                  <div className="text-4xl sm:text-6xl mb-4">👥</div>
+                  <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No followers yet</h3>
+                  <p className="text-gray-400 text-sm sm:text-base">{userData.username} doesn&apos;t have any followers yet!</p>
                 </div>
               )}
             </div>
           )}
 
           {activeTab === 'following' && (
-            <div className="grid gap-4">
+            <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
               {(userData?.following ?? []).map((followingId) => (
-                <UserListItem key={followingId} userId={followingId} />
+                <div
+                  key={followingId}
+                  className="transform transition-all duration-300 hover:scale-105"
+                >
+                  <UserListItem userId={followingId} />
+                </div>
               ))}
               {!userData?.following?.length && (
-                <div className="text-center text-muted-foreground">
-                  {userData.username} isn&apos;t following anyone yet.
+                <div className="col-span-full text-center py-8 sm:py-12">
+                  <div className="text-4xl sm:text-6xl mb-4">🔍</div>
+                  <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Not following anyone</h3>
+                  <p className="text-gray-400 text-sm sm:text-base">{userData.username} isn&apos;t following anyone yet!</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'posts' && (
+            <div className="space-y-4 sm:space-y-6">
+              <AnimatePresence>
+                {posts
+                .slice()
+                  .sort((a, b) => {
+                    const aTime = a.timestamp instanceof Date
+                      ? a.timestamp.getTime()
+                      : (a.timestamp?.seconds || 0) * 1000;
+                  
+                    const bTime = b.timestamp instanceof Date
+                      ? b.timestamp.getTime()
+                      : (b.timestamp?.seconds || 0) * 1000;
+                  
+                    return bTime - aTime; // latest first
+                  })
+                .map((post) => (
+                  <motion.div
+                    key={post.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -20 }}
+                    className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200"
+                  >
+                    <div onClick={() => handlePostClick(post.id)}>
+                       <div className="p-2 px-3 pb-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="relative">
+                              {userData?.profilepic ? (
+                                <Image
+                                  src={userData.profilepic}
+                                  alt={`${userData.username}'s profile`}
+                                  height={40}
+                                  width={40}
+                                  className="w-10 h-10 rounded-full"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
+                                  {post.userName.charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-gray-900 dark:text-white">
+                                {post.userName}
+                              </h3>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">
+                                {formatRelativeTime(post.timestamp)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {currentUser && post.userId !== currentUser.uid && (
+                            <MotionButton
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              onClick={(e) => 
+                                userFollowing.includes(post.userId) 
+                                  ? handleUnfollow(post.userId, e)
+                                  : handleFollow(post.userId, e)
+                              }
+                              className={`px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 flex items-center gap-1 ${
+                                userFollowing.includes(post.userId)
+                                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                                  : 'bg-blue-500 text-white hover:bg-blue-600'
+                              }`}
+                            >
+                              {userFollowing.includes(post.userId) ? (
+                                <>
+                                  <UserMinus size={14} />
+                                  Unfollow
+                                </>
+                              ) : (
+                                <>
+                                  <UserPlus size={14} />
+                                  Follow
+                                </>
+                              )}
+                            </MotionButton>
+                          )}
+                        </div>
+                      </div>
+                      <PostContent content={post.content}/>
+                    </div>
+
+                    {/* Image Gallery */}
+                    <div className="px-4">
+                      <ImageGallery images={post.images || []} postId={post.id} />
+                    </div>
+                
+                    {/* Post Actions */}
+                    <PostActions 
+                      post={post}
+                      currentUser={currentUser}
+                      onDislike={handleDislike}
+                      onShare={handleShare}
+                      onToggleComment={toggleCommentBox}
+                    />
+                
+                    {/* Comment Section */}
+                    <CommentSection 
+                      post={post}
+                      currentUser={currentUserData}
+                      cachedUsers={cachedUsers}
+                      onCommentInputChange={(postId: string, value: string) => {
+                        setCommentInputs(prev => ({
+                          ...prev,
+                          [postId]: value
+                        }));
+                      }}
+                      onPostComment={handlePostComment}
+                      commentInput={commentInputs[post.id]}
+                      commentBoxStates={commentBoxStates}
+                    />  
+                  </motion.div>
+                ))}
+                {posts.length === 0 && (
+                  <div className="text-center py-8 sm:py-12">
+                    <div className="text-4xl sm:text-6xl mb-4">📝</div>
+                    <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No posts yet</h3>
+                    <p className="text-gray-400 text-sm sm:text-base">{userData.username} hasn&apos;t shared any failure stories yet!</p>
+                  </div>
+                )}
+              </AnimatePresence>
             </div>
           )}
         </div>
