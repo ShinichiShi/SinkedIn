@@ -67,7 +67,7 @@ export default function RootLayout({
                   </div>
                 </footer>
               </div>
-              <Chatbot />
+              {/* <Chatbot /> */}
             </AuthProvider>
           </ThemeProvider>
           <SpeedInsights />
