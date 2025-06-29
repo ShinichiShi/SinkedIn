@@ -484,8 +484,7 @@ export default function Profile() {
             <div className="container max-w-6xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
               {activeTab === 'followers' && (
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
-                  {userData?.followers.map((followerId) => (
-                    <div
+                    {(userData?.followers??[]).map((followerId) => (                    <div
                       key={followerId}
                       className="transform transition-all duration-300 hover:scale-105"
                     >
@@ -504,7 +503,7 @@ export default function Profile() {
 
               {activeTab === 'following' && (
                 <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
-                  {userData?.following.map((followingId) => (
+                  {(userData?.following??[]).map((followingId) => (
                     <div
                       key={followingId}
                       className="transform transition-all duration-300 hover:scale-105"

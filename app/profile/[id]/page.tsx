@@ -316,11 +316,11 @@ export default function UserProfile(): JSX.Element {
 
           {activeTab === 'followers' && (
             <div className="grid gap-4">
-              {userData?.followers.map((followerId) => (
+              {(userData?.followers ?? []).map((followerId) => (
                 <UserListItem key={followerId} userId={followerId} />
               ))}
-              {!userData?.followers.length && (
-                <div className="text-center text-gray-400 py-12">
+              {!userData?.followers?.length && (
+                <div className="text-center text-muted-foreground">
                   {userData.username} has no followers yet.
                 </div>
               )}
@@ -329,11 +329,11 @@ export default function UserProfile(): JSX.Element {
 
           {activeTab === 'following' && (
             <div className="grid gap-4">
-              {userData?.following?.map((followingId) => (
+              {(userData?.following ?? []).map((followingId) => (
                 <UserListItem key={followingId} userId={followingId} />
               ))}
               {!userData?.following?.length && (
-                <div className="text-center text-gray-400 py-12">
+                <div className="text-center text-muted-foreground">
                   {userData.username} isn&apos;t following anyone yet.
                 </div>
               )}
