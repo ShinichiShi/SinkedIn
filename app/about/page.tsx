@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 const StoryPage = () => {
   const devComments = [
     { name: "Supreeth", comment: "We walked on a path that no one had ever walked on before... will anyone ever walk on it? 🗿", avatar: "/path/to/avatar1.jpg" },
-    { name: "Vaibhav", comment: "Facing criticism on a project can feel tough,but it's a good opportunity for growth.", avatar: "/path/to/avatar2.jpg" },
+   
     { name: "Ayush", comment: "No comments (he's sleeping probably so he didnt send me anything)", avatar: "/path/to/avatar3.jpg" },
     { name: "Rudraksha", comment: "Sex-sux karo itna nahi sochte.", avatar: "/path/to/avatar3.jpg" },
   ];
@@ -33,15 +33,18 @@ const StoryPage = () => {
       </section>
 
       <section className="bg-background py-16 px-8">
-        <h2 className="text-2xl font-semibold mb-6 text-center">What Our Developers Say</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 max-w-6xl mx-auto">
+        <h2 className="text-2xl font-semibold mb-10 text-center">What Our Developers Say</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 max-w-6xl mx-auto">
           {devComments.map((dev, index) => (
             <div
               key={index}
-              className="flex flex-col items-center text-center bg-background border border-border shadow-md rounded-lg p-6"
+              className="flex flex-col items-center text-center bg-card border border-border shadow-lg rounded-xl p-8 transition-transform hover:scale-105 hover:shadow-2xl"
             >
-              <h3 className="font-semibold text-lg">{dev.name}</h3>
-              <p className="text-gray-600 mt-2">{dev.comment}</p>
+              <div className="w-20 h-20 rounded-full bg-primary flex items-center justify-center text-2xl font-bold text-primary-foreground mb-4 shadow">
+                {dev.name[0]}
+              </div>
+              <h3 className="font-semibold text-lg text-primary mb-2">{dev.name}</h3>
+              <p className="text-muted-foreground italic">"{dev.comment}"</p>
             </div>
           ))}
         </div>

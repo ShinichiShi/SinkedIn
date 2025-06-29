@@ -159,77 +159,53 @@ export function CreatePost() {
 
   return (
     <motion.div
-      variants={containerVariants}
-      initial="rest"
-      whileHover="hover"
-      onHoverStart={() => setHovered(true)}
-      onHoverEnd={() => setHovered(false)}
-      className="relative mb-6"
+      whileHover={{ scale: 1.01 }}
+      className="relative mb-8"
     >
-      
-      {/* Main container */}
-      <div className="relative bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/60 
-        hover:border-slate-600/70 transition-all duration-300 overflow-hidden ">
-        
-        {/* Subtle top accent */}
-        <motion.div 
-          className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-500/30 to-transparent"
-          variants={borderVariants}
-          initial="rest"
-          animate={hovered ? "hover" : "rest"}
-        />
-        
-        <div className="p-4">
-          <div className="flex gap-3">
-            {/* Profile Picture */}
-            <motion.div   
-              whileHover={{ scale: 1.05 }}
-              transition={{ duration: 0.2 }}
-              className="relative w-12 h-12 rounded-xl overflow-hidden"
-            >
-              <Image
-                src={currentUserProfilePic}
-                alt="User's avatar"
-                width={48}
-                height={48}
-                className="w-full h-full object-cover"
-              />
-            </motion.div>
+      {/* Card */}
+      <div className="relative bg-slate-900/50 border border-slate-700/60 backdrop-blur-lg rounded-2xl shadow-xl transition-all duration-300 overflow-hidden">
 
-            <div className="flex-1 space-y-3">
-              {/* Text Area */}
-              <div className="relative">
-                <motion.textarea
-                  whileFocus={{ 
-                    borderColor: "rgba(148, 163, 184, 0.5)"
-                  }}
-                  placeholder="What's on your mind?"
-                  value={postContent}
-                  onChange={handleTextChange}
-                  onFocus={() => setFocused(true)}
-                  onBlur={() => setFocused(false)}
-                  className="w-full min-h-[90px] p-3 rounded-xl bg-slate-700/30 border border-slate-600/40 
-                    focus:outline-none focus:border-slate-400/60 placeholder-slate-400 resize-none 
-                    transition-all duration-200 text-slate-100 hover:bg-slate-700/40"
-                />
-                
-                {/* Character count */}
-                <AnimatePresence>
-                  {focused && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.9 }}
-                      className="absolute -bottom-1 right-2 px-2 py-1 bg-slate-800/90 
-                        border border-slate-600/40 rounded-lg text-xs"
-                    >
-                      <span className={charCount > maxChars * 0.8 ? "text-orange-400" : "text-slate-400"}>
-                        {maxChars - charCount}
-                      </span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+        {/* Top Light Line */}
+        <motion.div
+          layout
+          className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-blue-500/20 to-transparent"
+        />
+
+        <div className="p-6 space-y-5">
+          {/* Header */}
+          <div className="flex gap-4">
+            <Image
+              src={currentUserProfilePic}
+              alt="User avatar"
+              width={48}
+              height={48}
+              className="w-12 h-12 rounded-xl object-cover"
+            />
+
+            {/* Text Area */}
+            <div className="flex-1 space-y-4">
+              <motion.textarea
+                placeholder="Where is my mind?"
+                value={postContent}
+                onChange={handleTextChange}
+                className="w-full min-h-[100px] bg-slate-800/40 border border-slate-600/50 rounded-xl p-4 text-slate-100 placeholder-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all duration-200"
+              />
+
+              {/* Char Counter */}
+              <AnimatePresence>
+                {postContent.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 5 }}
+                    className="text-right text-sm text-slate-400"
+                  >
+                    <span className={charCount > maxChars * 0.8 ? "text-orange-400" : ""}>
+                      {maxChars - charCount} characters left
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* Image Preview */}
               <AnimatePresence>
@@ -238,23 +214,19 @@ export function CreatePost() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="relative rounded-xl overflow-hidden border border-slate-600/40"
+                    className="relative rounded-xl overflow-hidden border border-slate-700"
                   >
-                    <div className="relative max-h-64 overflow-hidden">
-                      <Image
-                        src={postImage}
-                        alt="Post attachment"
-                        width={600}
-                        height={400}
-                        className="w-full h-auto object-cover"
-                      />
-                    </div>
+                    <Image
+                      src={postImage}
+                      alt="Post image"
+                      width={600}
+                      height={400}
+                      className="w-full object-cover max-h-64"
+                    />
                     <motion.button
-                      whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       onClick={removeImage}
-                      className="absolute top-2 right-2 p-1.5 rounded-full bg-slate-900/80 hover:bg-red-500/80 
-                        text-white transition-colors duration-200 backdrop-blur-sm"
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-black/50 hover:bg-red-500/70 text-white backdrop-blur"
                     >
                       <X size={14} />
                     </motion.button>
@@ -262,72 +234,36 @@ export function CreatePost() {
                 )}
               </AnimatePresence>
 
-              {/* Action Bar */}
+              {/* Action Row */}
               <div className="flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  {/* Image upload button */}
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-700/40 
-                      hover:bg-slate-600/50 border border-slate-600/40 hover:border-slate-500/60 
-                      transition-all duration-200 text-slate-300 hover:text-slate-200"
-                  >
-                    <Camera size={16} />
-                    <span className="text-sm font-medium">Photo</span>
-                  </motion.button>
-
-                  {/* Subtle indicator */}
-                  {postContent.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="flex items-center gap-1 text-slate-400"
-                    >
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                      >
-                        <Sparkles size={12} />
-                      </motion.div>
-                      <span className="text-xs">Ready</span>
-                    </motion.div>
-                  )}
-                </div>
-
-                {/* Submit Button */}
                 <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileTap={{ scale: 0.96 }}
+                  className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-slate-700/50 border border-slate-600 hover:border-slate-500 text-slate-300 hover:text-slate-100 transition-all"
+                >
+                  <Camera size={16} />
+                  Photo
+                </motion.button>
+
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.96 }}
                   onClick={handlePostSubmit}
                   disabled={loading || !postContent.trim()}
-                  className="relative overflow-hidden rounded-lg px-4 py-2 
-                    disabled:opacity-50 disabled:cursor-not-allowed font-medium text-white
-                    bg-blue-600/80 hover:bg-blue-600 transition-all duration-200
-                    border border-blue-500/40 hover:border-blue-400/60"
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-all
+                    bg-blue-600 hover:bg-blue-500 text-white border-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <div className="flex items-center gap-1.5">
-                    {loading ? (
-                      <>
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                          className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
-                        />
-                        <span className="text-sm">Posting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <motion.div
-                          animate={{ x: hovered ? [0, 2, 0] : 0 }}
-                          transition={{ duration: 0.6, repeat: hovered ? Infinity : 0 }}
-                        >
-                          <Send size={14} />
-                        </motion.div>
-                        <span className="text-sm">Post</span>
-                      </>
-                    )}
-                  </div>
+                  {loading ? (
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
+                    />
+                  ) : (
+                    <>
+                      <Send size={14} />
+                      Post
+                    </>
+                  )}
                 </motion.button>
               </div>
             </div>
@@ -335,20 +271,18 @@ export function CreatePost() {
         </div>
       </div>
 
-      {/* Error Message */}
+      {/* Error */}
       <AnimatePresence>
         {errorMessage && (
           <motion.div
             initial={{ opacity: 0, y: 5 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -5 }}
-            className="mt-3"
+            className="mt-4"
           >
-            <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3">
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-red-400" />
-                <span className="text-red-300 text-sm">{errorMessage}</span>
-              </div>
+            <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-300 flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-red-400" />
+              {errorMessage}
             </div>
           </motion.div>
         )}
