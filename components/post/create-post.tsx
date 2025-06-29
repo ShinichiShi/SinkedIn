@@ -272,9 +272,9 @@ export function CreatePost() {
             <Image
               src={currentUserProfilePic}
               alt="User avatar"
-              width={48}
-              height={48}
-              className="w-12 h-12 rounded-xl object-cover"
+              width={40}
+              height={40}
+              className="w-10 h-10 rounded-xl object-cover"
             />
 
             {/* Text Area */}
@@ -333,7 +333,6 @@ export function CreatePost() {
                     <input
                       type="file"
                       multiple
-                      capture="environment"
                       accept="image/*"
                       onChange={(e) => e.target.files && handleFileSelect(e.target.files)}
                       className="hidden"

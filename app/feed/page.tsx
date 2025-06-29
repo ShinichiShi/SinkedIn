@@ -537,7 +537,7 @@ export default function Feed(): ReactElement {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 container">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 md:container">
       <div className="flex max-w-7xl mx-auto">
         {/* Left Sidebar */}
             <aside className="hidden lg:block w-64">
@@ -545,7 +545,7 @@ export default function Feed(): ReactElement {
     </aside>
       
        <main className="flex-1 overflow-y-auto max-h-[calc(100vh-120px)] no-scrollbar px-4 py-6 lg:mr-80">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-2xl ">
               {/* Create Post */}
               <div className="mb-6">
                 <CreatePost />
