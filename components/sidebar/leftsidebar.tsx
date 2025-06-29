@@ -78,7 +78,7 @@ export function LeftSidebar() {
   const toggleBio = () => setIsBioExpanded(!isBioExpanded);
 
   return (
-    <div className="hidden w-[16%] absolute left-0 top-16 h-screen bg-background border-r border-border p-4 transition-colors md:block">
+    <div className="hidden w-[16%] absolute left-0 top-16 h-[calc(100vh-70px)] bg-background border-r border-border p-4 transition-colors md:block">
       <div className="space-y-6">
       <div className="p-4 rounded-lg border border-border bg-card shadow-md text-center">
         <Avatar className="w-16 h-16 mx-auto mb-4">
