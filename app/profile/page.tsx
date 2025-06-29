@@ -311,9 +311,8 @@ export default function Profile() {
             />
             
             {/* Profile Content */}
-            <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-8">
-              {/* Mobile Layout */}
-              <div className="block sm:hidden">
+            <div className="absolute inset-0 flex flex-col justify-end p-4 sm:p-8">              {/* Mobile Layout */}
+              <div className="block sm:hidden mt-5">
                 {/* Profile Picture - Centered on mobile */}
                 <div className="flex justify-center mb-4">
                   <div className="w-24 h-24 rounded-full border-4 border-white shadow-2xl overflow-hidden bg-gray-200">
