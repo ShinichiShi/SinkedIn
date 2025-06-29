@@ -251,7 +251,7 @@ export function CreatePost() {
   return (
     <motion.div
       whileHover={{ scale: 1.01 }}
-      className="relative mb-8"
+      className="relative mb-4"
     >
       
       {/* Main container */}

@@ -4,6 +4,8 @@ import Image from "next/image";
 import { Post } from "@/types";
 import { formatRelativeTime } from "@/utils/timeUtils";
 import Link from "next/link";
+import { Send } from "lucide-react";
+
 const MotionButton = motion.button;
 
 interface CommentSectionProps {
@@ -98,7 +100,7 @@ export default function CommentSection({
                 )}
               </div>
 
-              <div className="flex-1 flex items-center space-x-2">
+              <div className="flex-1 flex items-center space-x-1">
                 <input
                   type="text"
                   placeholder="Write a comment..."
@@ -110,16 +112,16 @@ export default function CommentSection({
                       onPostComment(post.id, e as any);
                     }
                   }}
-                  className="flex-1 bg-gray-100 dark:bg-gray-700 border-0 rounded-full px-4 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="flex-1 bg-gray-100 dark:bg-gray-700 border-0 rounded-lg px-4 py-2 text-sm text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none"
                 />
                 <MotionButton
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={(e) => onPostComment(post.id, e as any)}
                   disabled={!commentInput?.trim()}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-full text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                  className="px-2 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                 >
-                  Post
+                  <Send size={18} />
                 </MotionButton>
               </div>
             </div>

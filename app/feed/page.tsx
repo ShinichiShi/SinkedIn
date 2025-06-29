@@ -57,75 +57,150 @@ export default function Feed(): ReactElement {
   const [commentInputs, setCommentInputs] = useState<{[key: string]: string}>({});
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [userFollowing, setUserFollowing] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState<'foryou' | 'following'>('foryou');
   
-  const fetchInitialPosts = async () => {
+  const fetchInitialPosts = async (tab: 'foryou' | 'following' = activeTab) => {
     try {
-      // Create a compound query to handle both server timestamp and client timestamp
-      const postsQuery = query(
-        collection(db, "posts"),
-        orderBy("timestamp", "desc"),
-        limit(10)
-      );
-      const documentSnapshots = await getDocs(postsQuery);
+      let postsQuery;
       
-      const postsData = documentSnapshots.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Post[];
-      
-      // Get unique user IDs from posts that aren't already cached
-      const allUserIds = Array.from(new Set(postsData.map((post: Post) => post.userId)));
-      const uncachedUserIds = allUserIds.filter(userId => !cachedUsers.has(userId));
-      
-      console.log(`Total users needed: ${allUserIds.length}, Cached: ${allUserIds.length - uncachedUserIds.length}, New fetches: ${uncachedUserIds.length}`);
-      
-      let currentUserCache = new Map(cachedUsers);
-      
-      // Only fetch users that aren't in cache
-      if (uncachedUserIds.length > 0) {
-        // Firestore 'in' query has a limit of 10, so we need to batch if more than 10 users
-        const batches = [];
-        for (let i = 0; i < uncachedUserIds.length; i += 10) {
-          const batch = uncachedUserIds.slice(i, i + 10);
-          batches.push(batch);
+      if (tab === 'following') {
+        // If no following users, return empty array
+        if (userFollowing.length === 0) {
+          setPosts([]);
+          setLastVisible(null);
+          setHasMore(false);
+          return;
         }
         
-        for (const batch of batches) {
-          const usersQuery = query(
-            collection(db, "users"),
-            where("__name__", "in", batch)
+        // Handle Firestore 'in' query limitation (max 10 items)
+        // If user follows more than 10 people, we need to make multiple queries
+        const followingBatches = [];
+        for (let i = 0; i < userFollowing.length; i += 10) {
+          followingBatches.push(userFollowing.slice(i, i + 10));
+        }
+        
+        let allPosts: Post[] = [];
+        
+        // Execute queries for each batch
+        for (const batch of followingBatches) {
+          const batchQuery = query(
+            collection(db, "posts"),
+            where("userId", "in", batch),
+            orderBy("timestamp", "desc"),
+            limit(10)
           );
-          const usersSnapshot = await getDocs(usersQuery);
           
-          usersSnapshot.docs.forEach(doc => {
-            currentUserCache.set(doc.id, doc.data());
-          });
+          const batchSnapshot = await getDocs(batchQuery);
+          const batchPosts = batchSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as Post[];
+          
+          allPosts = [...allPosts, ...batchPosts];
         }
         
-        setCachedUsers(currentUserCache);
+        // Sort all posts by timestamp and limit to 10 most recent
+        allPosts.sort((a, b) => {
+          const aTime = a.timestamp?.seconds || 0;
+          const bTime = b.timestamp?.seconds || 0;
+          return bTime - aTime;
+        });
+        
+        const postsData = allPosts.slice(0, 10);
+        
+        // Set lastVisible for pagination
+        if (postsData.length > 0) {
+          // Find the document snapshot for the last post
+          const lastPostId = postsData[postsData.length - 1].id;
+          const lastPostQuery = query(
+            collection(db, "posts"),
+            where("__name__", "==", lastPostId)
+          );
+          const lastPostSnapshot = await getDocs(lastPostQuery);
+          setLastVisible(lastPostSnapshot.docs[0]);
+        }
+        
+        // Process posts with user data
+        const processedPosts = await processPostsWithUserData(postsData);
+        setPosts(processedPosts);
+        setHasMore(postsData.length === 10);
+        
+      } else {
+        // Fetch all posts for "For you" tab
+        postsQuery = query(
+          collection(db, "posts"),
+          orderBy("timestamp", "desc"),
+          limit(10)
+        );
+        
+        const documentSnapshots = await getDocs(postsQuery);
+        
+        const postsData = documentSnapshots.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Post[];
+        
+        const processedPosts = await processPostsWithUserData(postsData);
+        
+        setPosts(processedPosts);
+        setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length-1]);
+        setHasMore(documentSnapshots.docs.length === 10);
       }
       
-      // Combine posts with user profile pictures
-      const postsWithProfilePics: Post[] = postsData.map((post: Post) => {
-        const userData = currentUserCache.get(post.userId);
-        return {
-          ...post,
-          userProfilePic: userData?.profilepic || null,
-          userName: userData?.username || post.userName || "Anonymous"
-        };
-      });
-      
-      console.log("Fetched posts with profile pics:", postsWithProfilePics);
-      console.log("Total cached users:", currentUserCache.size);
-      console.log("Firestore reads for users:", uncachedUserIds.length);
-      
-      setPosts(postsWithProfilePics);
-      setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length-1]);
-      setHasMore(documentSnapshots.docs.length === 10);
     } catch (error) {
       console.error("Error fetching initial posts:", error);
       toast.error("Error loading posts");
     }
+  };
+
+  const processPostsWithUserData = async (postsData: Post[]) => {
+    // Get unique user IDs from posts that aren't already cached
+    const allUserIds = Array.from(new Set(postsData.map((post: Post) => post.userId)));
+    const uncachedUserIds = allUserIds.filter(userId => !cachedUsers.has(userId));
+    
+    console.log(`Total users needed: ${allUserIds.length}, Cached: ${allUserIds.length - uncachedUserIds.length}, New fetches: ${uncachedUserIds.length}`);
+    
+    let currentUserCache = new Map(cachedUsers);
+    
+    // Only fetch users that aren't in cache
+    if (uncachedUserIds.length > 0) {
+      // Firestore 'in' query has a limit of 10, so we need to batch if more than 10 users
+      const batches = [];
+      for (let i = 0; i < uncachedUserIds.length; i += 10) {
+        const batch = uncachedUserIds.slice(i, i + 10);
+        batches.push(batch);
+      }
+      
+      for (const batch of batches) {
+        const usersQuery = query(
+          collection(db, "users"),
+          where("__name__", "in", batch)
+        );
+        const usersSnapshot = await getDocs(usersQuery);
+        
+        usersSnapshot.docs.forEach(doc => {
+          currentUserCache.set(doc.id, doc.data());
+        });
+      }
+      
+      setCachedUsers(currentUserCache);
+    }
+    
+    // Combine posts with user profile pictures
+    const postsWithProfilePics: Post[] = postsData.map((post: Post) => {
+      const userData = currentUserCache.get(post.userId);
+      return {
+        ...post,
+        userProfilePic: userData?.profilepic || null,
+        userName: userData?.username || post.userName || "Anonymous"
+      };
+    });
+    
+    console.log("Processed posts with profile pics:", postsWithProfilePics);
+    console.log("Total cached users:", currentUserCache.size);
+    console.log("Firestore reads for users:", uncachedUserIds.length);
+    
+    return postsWithProfilePics;
   };
 
   const loadMorePosts = useCallback(async () => {
@@ -133,18 +208,69 @@ export default function Feed(): ReactElement {
     
     setLoadingMore(true);
     try {
-      const postsQuery = query(
-        collection(db, "posts"),
-        orderBy("timestamp", "desc"),
-        startAfter(lastVisible),
-        limit(10)
-      );
-      const documentSnapshots = await getDocs(postsQuery);
+      let newPostsData: Post[] = [];
       
-      const newPostsData = documentSnapshots.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Post[];
+      if (activeTab === 'following') {
+        if (userFollowing.length === 0) {
+          setLoadingMore(false);
+          return;
+        }
+        
+        // Handle multiple batches for following users
+        const followingBatches = [];
+        for (let i = 0; i < userFollowing.length; i += 10) {
+          followingBatches.push(userFollowing.slice(i, i + 10));
+        }
+        
+        let allPosts: Post[] = [];
+        
+        for (const batch of followingBatches) {
+          const batchQuery = query(
+            collection(db, "posts"),
+            where("userId", "in", batch),
+            orderBy("timestamp", "desc"),
+            startAfter(lastVisible),
+            limit(10)
+          );
+          
+          const batchSnapshot = await getDocs(batchQuery);
+          const batchPosts = batchSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          })) as Post[];
+          
+          allPosts = [...allPosts, ...batchPosts];
+        }
+        
+        // Sort and limit
+        allPosts.sort((a, b) => {
+          const aTime = a.timestamp?.seconds || 0;
+          const bTime = b.timestamp?.seconds || 0;
+          return bTime - aTime;
+        });
+        
+        newPostsData = allPosts.slice(0, 10);
+        
+      } else {
+        const postsQuery = query(
+          collection(db, "posts"),
+          orderBy("timestamp", "desc"),
+          startAfter(lastVisible),
+          limit(10)
+        );
+        
+        const documentSnapshots = await getDocs(postsQuery);
+        
+        newPostsData = documentSnapshots.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Post[];
+        
+        // Update lastVisible for "For you" tab
+        if (documentSnapshots.docs.length > 0) {
+          setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length-1]);
+        }
+      }
       
       if (newPostsData.length === 0) {
         setHasMore(false);
@@ -152,58 +278,47 @@ export default function Feed(): ReactElement {
         return;
       }
       
-      // Get unique user IDs from new posts that aren't already cached
-      const allUserIds = Array.from(new Set(newPostsData.map((post: Post) => post.userId)));
-      const uncachedUserIds = allUserIds.filter(userId => !cachedUsers.has(userId));
+      // Process new posts with user data
+      const processedNewPosts = await processPostsWithUserData(newPostsData);
       
-      let currentUserCache = new Map(cachedUsers);
+      console.log("Loaded more posts with profile pics:", processedNewPosts);
       
-      // Only fetch users that aren't in cache
-      if (uncachedUserIds.length > 0) {
-        const batches = [];
-        for (let i = 0; i < uncachedUserIds.length; i += 10) {
-          const batch = uncachedUserIds.slice(i, i + 10);
-          batches.push(batch);
+      setPosts(prevPosts => [...prevPosts, ...processedNewPosts]);
+      setHasMore(newPostsData.length === 10);
+      
+      // Update lastVisible for following tab
+      if (activeTab === 'following' && newPostsData.length > 0) {
+        const lastPostId = newPostsData[newPostsData.length - 1].id;
+        const lastPostQuery = query(
+          collection(db, "posts"),
+          where("__name__", "==", lastPostId)
+        );
+        const lastPostSnapshot = await getDocs(lastPostQuery);
+        if (lastPostSnapshot.docs.length > 0) {
+          setLastVisible(lastPostSnapshot.docs[0]);
         }
-        
-        for (const batch of batches) {
-          const usersQuery = query(
-            collection(db, "users"),
-            where("__name__", "in", batch)
-          );
-          const usersSnapshot = await getDocs(usersQuery);
-          
-          usersSnapshot.docs.forEach(doc => {
-            currentUserCache.set(doc.id, doc.data());
-          });
-        }
-        
-        setCachedUsers(currentUserCache);
       }
       
-      // Combine new posts with user profile pictures using cache
-      const newPostsWithProfilePics: Post[] = newPostsData.map((post: Post) => {
-        const userData = currentUserCache.get(post.userId);
-        return {
-          ...post,
-          userProfilePic: userData?.profilepic || null,
-          userName: userData?.username || post.userName || "Anonymous"
-        };
-      });
-      
-      console.log("Loaded more posts with profile pics:", newPostsWithProfilePics);
-      console.log("Firestore reads for users in load more:", uncachedUserIds.length);
-      
-      setPosts(prevPosts => [...prevPosts, ...newPostsWithProfilePics]);
-      setLastVisible(documentSnapshots.docs[documentSnapshots.docs.length-1]);
-      setHasMore(documentSnapshots.docs.length === 10);
     } catch (error) {
       console.error("Error loading more posts:", error);
       toast.error("Error loading more posts");
     } finally {
       setLoadingMore(false);
     }
-  }, [lastVisible, loadingMore, hasMore, cachedUsers]);
+  }, [lastVisible, loadingMore, hasMore, cachedUsers, activeTab, userFollowing]);
+
+  const handleTabChange = (tab: 'foryou' | 'following') => {
+    if (tab === activeTab) return;
+    
+    setActiveTab(tab);
+    setPosts([]);
+    setLastVisible(null);
+    setHasMore(true);
+    setLoadingMore(false);
+    
+    // Fetch posts for the new tab
+    fetchInitialPosts(tab);
+  };
 
   const handleDislike = async (postId: string, event: React.MouseEvent) => {
     event.stopPropagation();
@@ -530,6 +645,13 @@ export default function Feed(): ReactElement {
     }
   }, [posts]);
 
+  // Re-fetch posts when userFollowing changes and we're on following tab
+  useEffect(() => {
+    if (userFollowing.length > 0 && activeTab === 'following' && !loading) {
+      fetchInitialPosts('following');
+    }
+  }, [userFollowing, activeTab]);
+
   if (loading) return (
     <div className="flex h-screen items-center justify-center">
       <CustomLoader loading={loading} size={50} color="#3b82f6" />
@@ -547,8 +669,36 @@ export default function Feed(): ReactElement {
        <main className="flex-1 overflow-y-auto max-h-[calc(100vh-120px)] no-scrollbar px-4 py-6 lg:mr-80">
       <div className="max-w-2xl ">
               {/* Create Post */}
-              <div className="mb-6">
+              <div className="mb-3">
                 <CreatePost />
+              </div>
+
+              {/* Feed Tabs */}
+              <div className="mb-3">
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="flex">
+                    <button
+                      onClick={() => handleTabChange('foryou')}
+                      className={`flex-1 py-3 px-4 text-sm font-medium transition-colors duration-200 ${
+                        activeTab === 'foryou'
+                          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                      }`}
+                    >
+                      For you
+                    </button>
+                    <button
+                      onClick={() => handleTabChange('following')}
+                      className={`flex-1 py-3 px-4 text-sm font-medium transition-colors duration-200 ${
+                        activeTab === 'following'
+                          ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
+                          : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                      }`}
+                    >
+                      Following
+                    </button>
+                  </div>
+                </div>
               </div>
 
             {/* Posts Feed */}
@@ -629,12 +779,25 @@ export default function Feed(): ReactElement {
               {/* No Posts Message */}
               {!loading && posts.length === 0 && (
                 <div className="text-center py-12">
-                  <p className="text-gray-500 dark:text-gray-400 text-lg">
-                    No posts to display
-                  </p>
-                  <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
-                    Follow some users or create your first post!
-                  </p>
+                  {activeTab === 'following' ? (
+                    <>
+                      <p className="text-gray-500 dark:text-gray-400 text-lg">
+                        No posts from people you follow
+                      </p>
+                      <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
+                        Follow some users to see their posts here
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-gray-500 dark:text-gray-400 text-lg">
+                        No posts to display
+                      </p>
+                      <p className="text-gray-400 dark:text-gray-500 text-sm mt-2">
+                        Follow some users or create your first post!
+                      </p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
