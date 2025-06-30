@@ -300,44 +300,44 @@ useEffect(() => {
 
   if (loading && !currentUser) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <HashLoader color="white" />
+      <div className="flex h-screen items-center justify-center bg-gray-50 dark:bg-black">
+        <HashLoader color="#8b5cf6" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white p-4 md:p-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 dark:text-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">Network</h1>
         
         {/* Search Input */}
         <div className="relative mb-8">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-gray-400 w-5 h-5" />
           <input
             type="text"
             placeholder="Search users by name or email..."
-            className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/5 border border-white/10 focus:border-purple-500/50 focus:outline-none"
+            className="w-full pl-12 pr-4 py-4 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 focus:border-blue-500/50 focus:outline-none text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           {searching && (
             <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-              <HashLoader size={20} color="white" />
+              <HashLoader size={20} color="#3b82f6" />
             </div>
           )}
         </div>
 
         {/* Search Results Info */}
         {isSearchMode && (
-          <div className="mb-4 text-gray-400">
+          <div className="mb-4 text-gray-600 dark:text-gray-400">
             {searchResults.length} user{searchResults.length !== 1 ? 's' : ''} found
           </div>
         )}
         
         {loading ? (
           <div className="flex justify-center">
-            <HashLoader color="white" />
+            <HashLoader color="#3b82f6" />
           </div>
         ) : (
           <>
@@ -351,24 +351,27 @@ useEffect(() => {
                     key={user.id}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="p-6 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all duration-300"
+                    className="p-6 rounded-xl bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 hover:bg-gray-50 dark:hover:bg-white/10 transition-all duration-300 shadow-sm dark:shadow-none"
                   >
-                      <Link href={`/profile/${user.id}`}>
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                      <Avatar className="w-16 h-16 border-2 border-purple-500/20">
-                        <AvatarImage 
-                          src={user.profilepic || defaultAvatar}
-                          alt={user.username}
-                          className="object-cover"
-                        />
-                        <AvatarFallback className="bg-purple-500/20 text-purple-300">
-                          {user.username?.charAt(0)?.toUpperCase() || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
+                      <Link href={`/profile/${user.id}`} className="cursor-pointer">
+                        <Avatar className="w-16 h-16 border-2 border-blue-200 dark:border-blue-500/20 hover:border-blue-300 dark:hover:border-blue-400 transition-colors">
+                          <AvatarImage 
+                            src={user.profilepic || defaultAvatar}
+                            alt={user.username}
+                            className="object-cover"
+                          />
+                          <AvatarFallback className="bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-300">
+                            {user.username?.charAt(0)?.toUpperCase() || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                      </Link>
                       <div className="flex-1">
-                        <h3 className="text-xl font-semibold">{user.username}</h3>
-                        <p className="text-gray-400">{user.email}</p>
-                        <div className="flex gap-4 mt-2 text-sm text-gray-400">
+                        <Link href={`/profile/${user.id}`} className="cursor-pointer">
+                          <h3 className="text-xl font-semibold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{user.username}</h3>
+                          <p className="text-gray-600 dark:text-gray-400">{user.email}</p>
+                        </Link>
+                        <div className="flex gap-4 mt-2 text-sm text-gray-500 dark:text-gray-400">
                           <span>{user.followers?.length || 0} followers</span>
                           <span>{user.following?.length || 0} following</span>
                         </div>
@@ -379,14 +382,13 @@ useEffect(() => {
                         onClick={() => isFollowing ? handleUnfollow(user.id) : handleFollow(user.id)}
                         className={`px-6 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-300 ${
                           isFollowing 
-                            ? 'bg-purple-500/10 hover:bg-purple-500/20 text-purple-500'
-                            : 'bg-gradient-to-r from-purple-500 to-pink-500 hover:opacity-90'
+                            ? 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600'
+                            : 'bg-blue-500 text-white hover:bg-blue-600'
                         }`}
                       >
                         {isFollowing ? 'Unfollow' : 'Follow'}
                       </motion.button>
-                      </div>
-                      </Link>
+                    </div>
                   </motion.div>
                 );
               })}
@@ -394,13 +396,13 @@ useEffect(() => {
 
           {!isSearchMode && hasNextPage && (
             <div ref={loaderRef} className="flex justify-center mt-8">
-              {loadingMore && <HashLoader size={20} color="white" />}
+              {loadingMore && <HashLoader size={20} color="#8b5cf6" />}
             </div>
           )}
 
             {/* No Results */}
             {displayUsers.length === 0 && !loading && (
-              <div className="text-center text-gray-400 py-12">
+              <div className="text-center text-gray-500 dark:text-gray-400 py-12">
                 {isSearchMode ? 'No users found matching your search.' : 'No users found.'}
               </div>
             )}

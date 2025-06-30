@@ -92,12 +92,12 @@ const ImageGallery: FC<ImageGalleryProps> = ({ images, postId }) => {
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: index * 0.1 }}
-              className="relative flex-shrink-0 group/image cursor-pointer"
+              className={`relative group/image cursor-pointer ${images.length === 1 ? 'w-full' : 'flex-shrink-0'}`}
               onClick={() => openImageModal(index)}
               style={{
                 width: images.length === 1 ? '100%' : '280px',
                 height: images.length === 1 ? '400px' : '200px',
-                maxWidth: images.length === 1 ? '500px' : '280px'
+                maxWidth: images.length === 1 ? '100%' : '280px'
               }}
             >
               <div className="relative w-full h-full rounded-xl overflow-hidden 
@@ -106,7 +106,7 @@ const ImageGallery: FC<ImageGalleryProps> = ({ images, postId }) => {
                   src={imageUrl}
                   alt={`Post image ${index + 1}`}
                   fill
-                  className="object-cover group-hover/image:scale-105 transition-transform duration-300"
+                  className={`${images.length === 1 ? 'object-contain' : 'object-cover'} group-hover/image:scale-105 transition-transform duration-300`}
                   sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                 />
                 

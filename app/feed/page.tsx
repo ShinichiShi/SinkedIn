@@ -666,7 +666,7 @@ export default function Feed(): ReactElement {
       <LeftSidebar />
     </aside>
       
-       <main className="flex-1 overflow-y-auto max-h-[calc(100vh-120px)] no-scrollbar px-4 py-6 lg:mr-80">
+       <main className="flex-1 px-4 py-6 lg:mr-80">
       <div className="max-w-2xl ">
               {/* Create Post */}
               <div className="mb-3">
@@ -769,7 +769,7 @@ export default function Feed(): ReactElement {
 
               {/* End of Feed Message */}
               {!hasMore && posts.length > 0 && (
-                <div className="text-center py-8">
+                <div className="text-center pb-14">
                   <p className="text-gray-500 dark:text-gray-400">
                     You&apos;ve reached the end of your feed...How jobless can you be -_-
                   </p>
