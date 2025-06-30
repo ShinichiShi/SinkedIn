@@ -23,7 +23,7 @@ export default function Home() {
       scale: 1.00,
       scaleMobile: 1.00,
       color: 0xffffff,
-      backgroundColor: 0x0,
+      backgroundColor: 0x111827,
       points: 20.00,
       maxDistance: 12.00
     });
@@ -32,13 +32,13 @@ export default function Home() {
     };
   }, []);
 
-  return (    <div id="vanta-bg" className="min-h-screen w-full flex flex-col items-center justify-center relative -mt-14">
+  return (    <div id="vanta-bg" className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden">
       <div className="absolute inset-0 bg-black opacity-70"></div>
-        <main className="container mx-auto px-6 py-16 relative z-10 -mt-8">
+        <main className="container mx-auto px-6 relative z-10">
           <div 
             className="text-center space-y-6"
           >
-            <h1 className="text-3xl md:text-6xl font-bold tracking-tight">
+            <h1 className="text-3xl md:text-6xl font-bold tracking-tight text-white">
             <TextGenerateEffect words={"Welcome To SinkedIn"} />
             </h1>
           </div>
