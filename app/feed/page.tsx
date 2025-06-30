@@ -659,15 +659,18 @@ export default function Feed(): ReactElement {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 md:container">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="flex max-w-7xl mx-auto">
         {/* Left Sidebar */}
-            <aside className="hidden lg:block w-64">
-      <LeftSidebar />
-    </aside>
+        <aside className="hidden lg:block w-64 flex-shrink-0">
+          <div className="sticky top-0 h-screen overflow-y-auto">
+            <LeftSidebar />
+          </div>
+        </aside>
       
-       <main className="flex-1 px-4 py-6 lg:mr-80">
-      <div className="max-w-2xl ">
+        {/* Main Content */}
+        <main className="flex-1 min-w-0">
+          <div className="max-w-2xl mx-auto px-4 py-6">
               {/* Create Post */}
               <div className="mb-3">
                 <CreatePost />
@@ -803,10 +806,13 @@ export default function Feed(): ReactElement {
             </div>
           </div>
         </main>
-        <aside className="hidden lg:block fixed right-0 top-0 h-full w-80">
-      <RightSidebar />
-    </aside>
-       
+
+        {/* Right Sidebar */}
+        <aside className="hidden lg:block w-80 flex-shrink-0">
+          <div className="sticky top-0 h-screen overflow-y-auto">
+            <RightSidebar />
+          </div>
+        </aside>
       </div>
     </div>
   );
