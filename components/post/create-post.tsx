@@ -255,7 +255,7 @@ export function CreatePost() {
     >
       
       {/* Main container */}
-      <div className="relative bg-slate-200/50 backdrop-blur-sm rounded-2xl border border-slate-700/60 
+      <div className="relative bg-slate-400/50 dark:bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700/60 
         hover:border-slate-600/70 transition-all duration-300 overflow-hidden">
         
         {/* Subtle top accent */}
@@ -283,7 +283,7 @@ export function CreatePost() {
                 placeholder="Where is my mind?"
                 value={postContent}
                 onChange={handleTextChange}
-                className="w-full min-h-[100px] bg-slate-100/40 border border-slate-600/50 rounded-xl p-4 dark:text-slate-100 text-slate-900 placeholder-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all duration-200"
+                className="w-full min-h-[100px] bg-slate-200/40 dark:bg-slate-500/40 border border-slate-600/50 rounded-xl p-4 dark:text-slate-100 text-slate-900 placeholder-slate-600 dark:placeholder-slate-400  resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all duration-200"
               />
 
               {/* Char Counter */}

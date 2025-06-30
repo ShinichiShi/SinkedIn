@@ -24,7 +24,7 @@ const Hero: React.FC<HeroProps> = ({
           className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-purple-600"
           style={{
             backgroundImage: userData?.backgroundImage 
-              ? `linear-gradient(rgba(59, 130, 246, 0.8), rgba(37, 99, 235, 0.9)), url(${userData.backgroundImage})`
+              ? `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url(${userData.backgroundImage})`
               : undefined,
             backgroundSize: 'cover',
             backgroundPosition: 'center',

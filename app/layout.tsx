@@ -11,7 +11,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { clsx } from "clsx";
 import { cn } from "@/lib/utils";
 
-
+import Footer from "@/components/layout/footer";
 
 
 export default function RootLayout({
@@ -19,7 +19,9 @@ export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
-}) {  return (
+}) {  
+    
+  return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <title>SinkedIn</title>
@@ -54,18 +56,7 @@ export default function RootLayout({
         <main className="flex-1 pt-16 flex flex-col">
           {children}
         </main>
-        <footer className="fixed bottom-0 left-0 w-full border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
-                  <div className="container mx-auto px-4 flex h-14 items-center justify-between py-6">
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      © {new Date().getFullYear()} SinkedIn. All rights reserved.
-                    </p>
-                    <nav className="flex items-center space-x-4">
-                      <a href="/about" className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">About</a>
-                      <a href="/privacy" className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">Privacy</a>
-                      <a href="/terms" className="text-sm text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">Terms</a>
-                    </nav>
-                  </div>
-                </footer>
+         <Footer />
               </div>
               {/* <Chatbot /> */}
             </AuthProvider>
