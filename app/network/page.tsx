@@ -307,7 +307,7 @@ useEffect(() => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black text-gray-900 dark:text-white p-4 md:p-8">
+    <div className="min-h-screen bg-gray-50 dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 dark:text-white p-4 md:p-8">
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold mb-8">Network</h1>
         
@@ -323,7 +323,7 @@ useEffect(() => {
           />
           {searching && (
             <div className="absolute right-4 top-1/2 transform -translate-y-1/2">
-              <HashLoader size={20} color="#8b5cf6" />
+              <HashLoader size={20} color="#3b82f6" />
             </div>
           )}
         </div>
@@ -337,7 +337,7 @@ useEffect(() => {
         
         {loading ? (
           <div className="flex justify-center">
-            <HashLoader color="#8b5cf6" />
+            <HashLoader color="#3b82f6" />
           </div>
         ) : (
           <>
