@@ -21,10 +21,10 @@ const Hero: React.FC<HeroProps> = ({
       <div className="relative w-full min-h-[300px] sm:h-80 overflow-hidden">
         {/* Background Image or Gradient */}
         <div 
-          className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-purple-600"
+          className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900"
           style={{
             backgroundImage: userData?.backgroundImage 
-              ? `linear-gradient(rgba(59, 130, 246, 0.8), rgba(37, 99, 235, 0.9)), url(${userData.backgroundImage})`
+              ? `url(${userData.backgroundImage})`
               : undefined,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
@@ -47,7 +47,7 @@ const Hero: React.FC<HeroProps> = ({
                     priority
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-2xl sm:text-4xl font-bold text-blue-600 bg-blue-50 rounded-full">
+                  <div className="w-full h-full flex items-center justify-center text-2xl sm:text-4xl font-bold text-gray-600 bg-gray-100 rounded-full">
                     {userData?.username?.[0]?.toUpperCase() || "?"}
                   </div>
                 )}

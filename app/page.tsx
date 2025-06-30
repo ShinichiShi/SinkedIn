@@ -3,15 +3,38 @@
 import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
 import { ArrowRight, ThumbsDown, Users, Coffee, Scale } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { TextGenerateEffect } from "@/components/ui/text-generate-effect";
 import * as THREE from "three";
 import NET from "vanta/dist/vanta.net.min";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { firebaseApp } from "@/lib/firebase";
+import { useRouter } from "next/navigation";
 
 import Link from "next/link";
 
 export default function Home() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+  const auth = getAuth(firebaseApp);
+
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        // User is logged in, redirect to feed
+        router.push("/feed");
+      } else {
+        // User is not logged in, show landing page
+        setLoading(false);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [auth, router]);
+
+  useEffect(() => {
+    if (loading) return; // Don't initialize vanta if still loading
+
     const vantaEffect = NET({
       el: "#vanta-bg",
       THREE: THREE, 
@@ -30,7 +53,15 @@ export default function Home() {
     return () => {
       if (vantaEffect) vantaEffect.destroy();
     };
-  }, []);
+  }, [loading]);
+
+  if (loading) {
+    return (
+      <div className="fixed inset-0 w-full h-full flex items-center justify-center bg-gray-900">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (    <div id="vanta-bg" className="fixed inset-0 w-full h-full flex flex-col items-center justify-center overflow-hidden">
       <div className="absolute inset-0 bg-black opacity-70"></div>

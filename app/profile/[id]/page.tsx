@@ -390,8 +390,8 @@ export default function UserProfile() {
                className="absolute inset-0"
                style={{
                  backgroundImage: userData?.backgroundImage 
-                   ? `linear-gradient(rgba(0,0,0,0.6), rgba(0,0,0,0.8)), url(${userData.backgroundImage})`
-                   : 'linear-gradient(135deg, #1e3a8a 0%, #3730a3 50%, #581c87 100%)',
+                   ? `url(${userData.backgroundImage})`
+                   : 'linear-gradient(135deg, #374151 0%, #4B5563 50%, #6B7280 100%)',
                  backgroundSize: 'cover',
                  backgroundPosition: 'center',
                }}

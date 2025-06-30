@@ -255,12 +255,12 @@ export function CreatePost() {
     >
       
       {/* Main container */}
-      <div className="relative bg-slate-200/50 backdrop-blur-sm rounded-2xl border border-slate-700/60 
-        hover:border-slate-600/70 transition-all duration-300 overflow-hidden">
+      <div className="relative bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm rounded-2xl border border-gray-200 dark:border-gray-700 
+        hover:border-gray-300 dark:hover:border-gray-600 transition-all duration-300 overflow-hidden">
         
         {/* Subtle top accent */}
         <motion.div 
-          className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-500/30 to-transparent"
+          className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-gray-300 dark:via-gray-600 to-transparent"
           variants={borderVariants}
           initial="rest"
           animate={hovered ? "hover" : "rest"}
@@ -283,7 +283,7 @@ export function CreatePost() {
                 placeholder="Where is my mind?"
                 value={postContent}
                 onChange={handleTextChange}
-                className="w-full min-h-[100px] bg-slate-100/40 border border-slate-600/50 rounded-xl p-4 dark:text-slate-100 text-slate-900 placeholder-slate-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all duration-200"
+                className="w-full min-h-[100px] bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl p-4 dark:text-gray-100 text-gray-900 placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition-all duration-200"
               />
 
               {/* Char Counter */}
@@ -293,7 +293,7 @@ export function CreatePost() {
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 5 }}
-                    className="text-right text-sm text-slate-400"
+                    className="text-right text-sm text-gray-500 dark:text-gray-400"
                   >
                     <span className={charCount > maxChars * 0.8 ? "text-orange-400" : ""}>
                       {maxChars - charCount} characters left
@@ -312,9 +312,9 @@ export function CreatePost() {
                   <motion.label
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-900/40 
-                      hover:bg-slate-600/50 border border-slate-600/40 hover:border-slate-500/60 
-                      transition-all duration-200 text-slate-300 hover:text-slate-200 cursor-pointer
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-700 
+                      hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500 
+                      transition-all duration-200 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 cursor-pointer
                       disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {postImages.length === 0 ? (
@@ -345,7 +345,7 @@ export function CreatePost() {
                     <motion.div
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className="flex items-center gap-1 text-slate-400"
+                      className="flex items-center gap-1 text-gray-500 dark:text-gray-400"
                     >
                       <motion.div
                         animate={{ rotate: 360 }}

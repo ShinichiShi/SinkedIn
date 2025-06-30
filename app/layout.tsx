@@ -51,10 +51,10 @@ export default function RootLayout({
                 pauseOnHover
                 theme="colored"
               />
-        <main className="flex-1 pt-16 flex flex-col">
+        <main className="flex-1 pt-16 flex flex-col mb-0">
           {children}
         </main>
-        <footer className="fixed bottom-0 left-0 w-full border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
+        <footer className="border-t bg-background mt-auto">
                   <div className="container mx-auto px-4 flex h-14 items-center justify-between py-6">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                       © {new Date().getFullYear()} SinkedIn. All rights reserved.
