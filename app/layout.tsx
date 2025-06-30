@@ -11,7 +11,7 @@ import "react-toastify/dist/ReactToastify.css";
 import { clsx } from "clsx";
 import { cn } from "@/lib/utils";
 
-
+import Footer from "@/components/layout/footer";
 
 
 export default function RootLayout({
@@ -19,7 +19,9 @@ export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
-}) {  return (
+}) {  
+    
+  return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <title>SinkedIn</title>

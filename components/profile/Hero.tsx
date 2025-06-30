@@ -25,6 +25,7 @@ const Hero: React.FC<HeroProps> = ({
           style={{
             backgroundImage: userData?.backgroundImage 
               ? `url(${userData.backgroundImage})`
+
               : undefined,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
