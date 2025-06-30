@@ -83,9 +83,6 @@ export function Navbar() {
                 <Link href="/login">
                   <Button variant="ghost" size="sm">Login</Button>
                 </Link>
-                <Link href="/register">
-                  <Button variant="default" size="sm">Sign Up</Button>
-                </Link>
               </>
             )}
           </div>

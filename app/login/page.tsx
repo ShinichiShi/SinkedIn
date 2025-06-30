@@ -94,7 +94,7 @@ export default function Login() {
           type="button"
           variant="outline"
           onClick={handleGoogleSignIn}
-          className="w-full h-10 text-base font-medium bg-white hover:bg-gray-50 text-gray-900 border border-gray-300"
+          className="w-full h-10 text-base font-medium bg-white text-gray-900 border border-gray-300"
         >
           <FcGoogle className="mr-2 h-5 w-5" />
           Continue with Google
