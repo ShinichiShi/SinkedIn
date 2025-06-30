@@ -500,15 +500,15 @@ const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
   const getTabClassName = (tab: 'posts' | 'followers' | 'following') => {
     return `${
       activeTab === tab
-        ? 'border-b-2 border-white text-white'
-        : 'text-gray-400 hover:text-white border-b-2 border-transparent hover:border-gray-600'
+        ? 'border-b-2 border-blue-500 text-blue-600 dark:text-blue-400'
+        : 'text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 border-b-2 border-transparent hover:border-blue-300 dark:hover:border-blue-600'
     } px-3 sm:px-6 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-all cursor-pointer`;
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 ">
+    <div className="min-h-screen bg-gray-50 dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       {loading ? (
-        <div className="flex items-center justify-center h-screen">
+        <div className="flex items-center justify-center h-screen bg-gray-50 dark:bg-gradient-to-br dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
           <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin -mt-6" />
         </div>
       ) : (
@@ -521,9 +521,9 @@ const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
           />
          
           {/* Tabs and Content */}
-          <div className="bg-slate-900">
+          <div className="bg-white dark:bg-slate-900">
             {/* Tabs */}
-            <div className="border-b border-gray-700">
+            <div className="border-b border-gray-200 dark:border-gray-700">
               <div className="container max-w-6xl mx-auto px-4 sm:px-8">
                 <div className="flex overflow-x-auto">
                   <button
@@ -567,8 +567,8 @@ const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
                   {!userData?.followers?.length && (
                     <div className="col-span-full text-center py-8 sm:py-12">
                       <div className="text-4xl sm:text-6xl mb-4">👥</div>
-                      <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No followers yet</h3>
-                      <p className="text-gray-400 text-sm sm:text-base">Keep sharing your failures!</p>
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2">No followers yet</h3>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">Keep sharing your failures!</p>
                     </div>
                   )}
                 </div>
@@ -587,15 +587,15 @@ const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
                   {!userData?.following?.length && (
                     <div className="col-span-full text-center py-8 sm:py-12">
                       <div className="text-4xl sm:text-6xl mb-4">🔍</div>
-                      <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">Not following anyone</h3>
-                      <p className="text-gray-400 text-sm sm:text-base">Find some fellow failures!</p>
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2">Not following anyone</h3>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">Find some fellow failures!</p>
                     </div>
                   )}
                 </div>
               )}
 
               {activeTab === 'posts' && (
-                <div className="space-y-4 sm:space-y-6">
+                <div className="space-y-4 sm:space-y-6 max-w-2xl mx-auto">
                   <AnimatePresence>
                     {posts
                     .slice()
@@ -619,7 +619,7 @@ const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
                         className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden cursor-pointer hover:shadow-md transition-shadow duration-200"
                       >
                         <div onClick={() => handlePostClick(post.id)}>
-                           <div className="p-2 px-3 pb-2">
+                           <div className="p-4 pb-2">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center space-x-3">
                                 <div className="relative">
@@ -681,7 +681,7 @@ const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
                         </div>
 
                         {/* Image Gallery */}
-                        <div className="px-4">
+                        <div className={`pb-2 ${(post.images || []).length === 1 ? '' : 'px-4'}`}>
                           <ImageGallery images={post.images || []} postId={post.id} />
                         </div>
                     
@@ -714,8 +714,8 @@ const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
                     {posts.length === 0 && (
                       <div className="text-center py-8 sm:py-12">
                         <div className="text-4xl sm:text-6xl mb-4">📝</div>
-                        <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No posts yet</h3>
-                        <p className="text-gray-400 text-sm sm:text-base">Share your first failure story!</p>
+                        <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2">No posts yet</h3>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">Share your first failure story!</p>
                       </div>
                     )}
                   </AnimatePresence>
