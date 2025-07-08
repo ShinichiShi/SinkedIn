@@ -18,6 +18,7 @@ import { LeftSidebar } from "@/components/sidebar/leftsidebar";
 import { formatRelativeTime as formatTime } from "@/utils/timeUtils";
 import { RightSidebar } from "@/components/sidebar/rightsidebar";
 import { Comment,Post } from "@/types";
+import { createCommentNotification } from "@/lib/notifications";
 
 
 interface UserData {
@@ -336,6 +337,12 @@ const PostPage = () => {
         comments: updatedComments,
       }) : null);
       setCommentInput("");
+      
+      // Create comment notification
+      if (post && post.userId) {
+        await createCommentNotification(currentUser.uid, post.userId, post.id, commentInput);
+      }
+      
       toast.success("Comment added!");
     } catch (error) {
       console.error("Error adding comment:", error);

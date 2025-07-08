@@ -70,6 +70,12 @@ export function Navbar() {
                     Network
                   </Button>
                 </Link>
+                <Link href="/notifications">
+                  <Button variant="ghost" size="sm" className="hover:bg-primary/10">
+                    <Bell className="h-4 w-4 mr-2" />
+                    Notifications
+                  </Button>
+                </Link>
                 <ThemeToggle />
                 <Link href="/profile">
                   <Button variant="outline" size="sm" className="hover:bg-primary/10">
@@ -116,6 +122,12 @@ export function Navbar() {
                     <Button variant="ghost" size="sm" className="w-full justify-start">
                       <MessageSquare className="h-4 w-4 mr-2" />
                       Network
+                    </Button>
+                  </Link>
+                  <Link href="/notifications" className="block">
+                    <Button variant="ghost" size="sm" className="w-full justify-start">
+                      <Bell className="h-4 w-4 mr-2" />
+                      Notifications
                     </Button>
                   </Link>
                   <Link href="/profile" className="block">

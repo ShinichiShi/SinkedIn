@@ -14,6 +14,8 @@ import PostActions from "@/components/post/PostActions";
 import ImageGallery from "@/components/post/ImageGallery";
 import PostContent from "@/components/post/PostContent";
 import { formatRelativeTime } from "@/utils/timeUtils";
+import { createCommentNotification } from "@/lib/notifications";
+import Hero from "@/components/profile/Hero";
 import Image from "next/image";
 
 // Import custom hooks
