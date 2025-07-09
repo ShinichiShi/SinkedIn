@@ -67,14 +67,14 @@ export const PostsTab: React.FC<PostsTabProps> = ({
               <ImageGallery images={post.images || []} postId={post.id} />
             </div>
           
-            {/* Post Actions */}
-            <PostActions 
+            {/* <PostActions 
               post={post}
+
               currentUser={currentUser}
               onDislike={onDislike}
               onShare={onShare}
               onToggleComment={onToggleComment}
-            />
+            /> */}
           
             {/* Comment Section */}
             <CommentSection 
