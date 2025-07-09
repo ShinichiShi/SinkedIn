@@ -51,7 +51,7 @@ export default function RootLayout({
                 pauseOnFocusLoss
                 draggable
                 pauseOnHover
-                theme="colored"
+                theme="dark"
               />
         <main className="flex-1 pt-16 flex flex-col mb-0">
           {children}
