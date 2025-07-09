@@ -383,7 +383,7 @@ export default function UserProfile() {
       {/* Hero Section - Modified to show follow button for non-own profiles */}
      <div className="w-full">
            {/* Hero Section */}
-           <div className="relative w-full min-h-[300px] sm:h-80 overflow-hidden">
+           <div className="relative w-full min-h-[320px] sm:h-96 overflow-hidden">
              {/* Background Image or Gradient */}
              
              <div 
@@ -398,7 +398,7 @@ export default function UserProfile() {
              />
              
              {/* Profile Content - Unified Layout */}
-            <div className="absolute justify-end p-5 sm:top-30 left-0 right-0 bottom-0 flex flex-col">
+            <div className="absolute justify-end p-5 pt-20 sm:pt-24 left-0 right-0 bottom-0 flex flex-col">
           <div className="flex flex-col justify-center sm:flex-row items-center sm:items-end sm:justify-center gap-4 sm:gap-6">
             {/* Profile Picture */}
             <div className="relative shrink-0">

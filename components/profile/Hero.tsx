@@ -18,7 +18,7 @@ const Hero: React.FC<HeroProps> = ({
   return (
     <div className="w-full">
       {/* Hero Section */}
-      <div className="relative w-full min-h-[300px] sm:h-80 overflow-hidden">
+      <div className="relative w-full min-h-[320px] sm:h-96 overflow-hidden">
         {/* Background Image or Gradient */}
         <div 
           className="absolute inset-0 bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900"
@@ -33,7 +33,7 @@ const Hero: React.FC<HeroProps> = ({
         />
         
         {/* Profile Content - Unified Layout */}
-        <div className="absolute justify-end p-5 sm:top-30 left-0 right-0 bottom-0 flex flex-col">
+        <div className="absolute justify-end p-5 pt-20 sm:pt-16 left-0 right-0 bottom-0 flex flex-col">
           <div className="flex flex-col justify-center sm:flex-row items-center sm:items-end sm:justify-center gap-4 sm:gap-6">
             {/* Profile Picture */}
             <div className="relative shrink-0">
@@ -59,7 +59,7 @@ const Hero: React.FC<HeroProps> = ({
                     <div className="flex-1 text-center sm:text-left sm:pb-4">
                       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
                         {/* User Details */}
-                        <div className="space-y-2 sm:space-y-3">
+                        <div className="space-y-2 sm:space-y-3 text-center sm:text-left">
                           <h1 className="text-2xl sm:text-4xl font-bold text-white">
                             {userData?.username || 'Unknown User'}
                           </h1>
@@ -158,7 +158,7 @@ const Hero: React.FC<HeroProps> = ({
                 </div> */}
                 </div>
                 {/* Action Buttons */}
-                <div className="flex gap-2 sm:gap-3 shrink-0">
+                <div className="flex gap-2 sm:gap-3 shrink-0 justify-center sm:justify-start">
                   <Button
                     onClick={handleOpenModal}
                     variant="outline"
