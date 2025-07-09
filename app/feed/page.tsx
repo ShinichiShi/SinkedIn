@@ -23,13 +23,6 @@ import { usePostActions } from "@/hooks/usePostActions";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 import type { ReactElement, FC, ReactNode } from 'react';
 import {Post, Comment} from "@/types";
-import { 
-  createLikeNotification, 
-  removeLikeNotification, 
-  createCommentNotification, 
-  createShareNotification,
-  createFollowNotification 
-} from "@/lib/notifications";
 
 const MotionButton = motion.button;
 
