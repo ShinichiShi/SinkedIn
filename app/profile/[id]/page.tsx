@@ -58,6 +58,7 @@ export default function UserProfile() {
     handleShare,
     toggleCommentBox,
     handlePostComment,
+    handleDeletePost,
     handlePostClick,
     handleFollow,
     handleUnfollow
@@ -418,6 +419,7 @@ export default function UserProfile() {
                         onDislike={handleDislike}
                         onShare={handleShare}
                         onToggleComment={toggleCommentBox}
+                        onDeletePost={handleDeletePost}
                       />
                 
                       {/* Comment Section */}

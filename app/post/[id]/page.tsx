@@ -315,6 +315,7 @@ const PostPage = () => {
       }
 
       const newComment: Comment = {
+        id: `${post.id}-${Date.now()}`,
         userId: currentUser.uid,
         text: commentInput,
         userName: userName,
