@@ -1,16 +1,19 @@
 import { useState, useCallback, useEffect } from "react";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  getDocs,
+} from "firebase/firestore";
+import { db, auth } from "@/lib/firebase";
+import { toast } from "react-toastify";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from 'next/image';
+import { uploadToCloudinary } from "@/lib/cloudinary";
 import { Camera, X, Send, Sparkles, Plus, ImageIcon } from "lucide-react";
 import ErrorMsg from "./ErrorMsg";
 import ImagePreview from "./ImagePreview";
-
-// Custom hooks
-import { useAuth } from "@/hooks/useAuth";
-import { useCreatePost } from "@/hooks/useCreatePost";
-import { useImageHandling } from "@/hooks/useImageHandling";
-import { usePostValidation } from "@/hooks/usePostValidation";
-
 interface PostImage {
   file: File;
   preview: string;
@@ -18,60 +21,195 @@ interface PostImage {
 }
 
 export function CreatePost() {
+  const [postContent, setPostContent] = useState("");
+  const [postImages, setPostImages] = useState<PostImage[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [uploadingImages, setUploadingImages] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [currentUserProfilePic, setCurrentUserProfilePic] = useState("");
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [charCount, setCharCount] = useState(0);
+  const router = useRouter();
+
   const maxChars = 280;
   const maxImages = 2;
 
-  // Auth hook
-  const { currentUser, currentUserProfilePic } = useAuth();
-
-  // Post creation hook
-  const {
-    postContent,
-    setPostContent,
-    loading,
-    handlePostSubmit,
-    charCount,
-    handleTextChange
-  } = useCreatePost(maxChars);
-
-  // Image handling hook
-  const {
-    postImages,
-    setPostImages,
-    uploadingImages,
-    handleFileSelect,
-    removeImage,
-    uploadImagesToCloudinary
-  } = useImageHandling(maxImages);
-
-  // Post validation hook
-  const {
-    errorMessage,
-    setErrorMessage,
-    validatePost
-  } = usePostValidation();
-
-  // Enhanced post submit that includes image upload and validation
-  const handleEnhancedPostSubmit = async () => {
-    if (!validatePost(postContent, postImages)) {
+  const fetchCurrentUserProfile = useCallback(async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      router.push("/login");
       return;
     }
 
     try {
-      const imageUrls = await uploadImagesToCloudinary(postImages);
-      await handlePostSubmit(postContent, imageUrls);
+      const userDoc = await getDocs(collection(db, "users"));
+      const userData = userDoc.docs
+        .find((doc) => doc.id === currentUser.uid)
+        ?.data();
+
+      setCurrentUserProfilePic(
+        userData?.profilepic || 
+        "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"
+      );
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      setCurrentUserProfilePic(
+        "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"
+      );
+    }
+  }, [router]);
+
+  useEffect(() => {
+    fetchCurrentUserProfile();
+  }, [fetchCurrentUserProfile]);
+
+  // Upload images to Cloudinary when submitting
+  const uploadImagesToCloudinary = async (): Promise<string[]> => {
+    if (postImages.length === 0) return [];
+
+    setUploadingImages(true);
+    const uploadedUrls: string[] = [];
+
+    try {
+      for (const image of postImages) {
+        const url = await uploadToCloudinary(image.file);
+        uploadedUrls.push(url);
+      }
+      return uploadedUrls;
+    } catch (error) {
+      console.error("Error uploading images:", error);
+      throw new Error("Failed to upload images");
+    } finally {
+      setUploadingImages(false);
+    }
+  };
+
+  const handlePostSubmit = async () => {
+    if (!postContent.trim()) {
+      setErrorMessage("Post content is required.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) {
+        toast.error("Please log in to post");
+        router.push("/login");
+        return;
+      }
+
+      // Only validate text if there's content
+      if (postContent.trim()) {
+        const response = await fetch("/api/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: postContent }),
+        });
+
+        if (!response.ok) {
+          throw new Error("Failed to analyze sentiment");
+        }
+
+        const data = await response.json();
+
+        if (data.result !== "1") {
+          toast.error("ooo nice...how informative");
+          return;
+        }
+      }
+
+      // Upload images to Cloudinary only when posting
+      const imageUrls = await uploadImagesToCloudinary();
+
+      const postsRef = collection(db, "posts");
+      await addDoc(postsRef, {
+        content: postContent,
+        images: imageUrls,
+        timestamp: serverTimestamp(),
+        userName: currentUser.displayName || "Anonymous",
+        userId: currentUser.uid,
+        createdAt: new Date().toISOString(),
+        dislikes: 0,
+        dislikedBy: [],
+        shares: 0,
+        comments: [],
+      });
+
+      toast.success("Your voice shall be heard");
       
       // Clean up preview URLs
       postImages.forEach(image => {
         URL.revokeObjectURL(image.preview);
       });
       
+      setPostContent("");
       setPostImages([]);
+      setCharCount(0);
+      window.location.reload();
+
     } catch (error) {
+      console.error("Error processing post:", error);
       setErrorMessage("An error occurred while posting.");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const text = e.target.value;
+    if (text.length <= maxChars) {
+      setPostContent(text);
+      setCharCount(text.length);
+      setErrorMessage("");
+    }
+  };
+
+  // Handle file selection and create local previews
+  const handleFileSelect = (files: FileList) => {
+    const newImages: PostImage[] = [];
+    
+    Array.from(files).forEach((file) => {
+      if (postImages.length + newImages.length >= maxImages) {
+        toast.error(`Maximum ${maxImages} images allowed`);
+        return;
+      }
+
+      if (!file.type.startsWith('image/')) {
+        toast.error('Please select only image files');
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        toast.error('Image size should be less than 10MB');
+        return;
+      }
+
+      const preview = URL.createObjectURL(file);
+      const newImage: PostImage = {
+        file,
+        preview,
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+      };
+
+      newImages.push(newImage);
+    });
+
+    if (newImages.length > 0) {
+      setPostImages(prev => [...prev, ...newImages]);
+      // toast.success(`${newImages.length} image(s) added for preview`);
+    }
+  };
+
+  const removeImage = (imageId: string) => {
+    setPostImages(prev => {
+      const imageToRemove = prev.find(img => img.id === imageId);
+      if (imageToRemove) {
+        URL.revokeObjectURL(imageToRemove.preview);
+      }
+      return prev.filter(img => img.id !== imageId);
+    });
   };
 
   // Clean up object URLs when component unmounts
@@ -81,7 +219,7 @@ export function CreatePost() {
         URL.revokeObjectURL(image.preview);
       });
     };
-  }, [postImages]);
+  }, []);
 
   const containerVariants = {
     rest: { 
@@ -165,12 +303,7 @@ export function CreatePost() {
               </AnimatePresence>
 
               {/* Images Preview - Instagram Style Horizontal Scroll */}
-              <ImagePreview 
-                postImages={postImages} 
-                removeImage={removeImage} 
-                maxImages={maxImages} 
-                handleFileSelect={handleFileSelect} 
-              />
+              <ImagePreview postImages={postImages} removeImage={removeImage} maxImages={maxImages} handleFileSelect={handleFileSelect} />
  
               {/* Action Bar */}
               <div className="flex justify-between items-center">
@@ -231,7 +364,7 @@ export function CreatePost() {
                 <motion.button
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.96 }}
-                  onClick={handleEnhancedPostSubmit}
+                  onClick={handlePostSubmit}
                   disabled={loading || uploadingImages || (!postContent.trim() && postImages.length === 0)}
                   className="relative overflow-hidden rounded-lg px-4 py-2 
                     disabled:opacity-50 disabled:cursor-not-allowed font-medium text-white
