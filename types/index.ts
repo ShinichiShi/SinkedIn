@@ -13,6 +13,7 @@ export type Post = {
   images?: string[];
   deleted?: boolean;
   deletedAt?: Date;
+  category?: string;
 };
 export type Comment = {
   id: string;
