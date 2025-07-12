@@ -75,6 +75,7 @@ export const useCreatePost = (maxChars: number) => {
         dislikedBy: [],
         shares: 0,
         comments: [],
+        deleted: false,
         category: postCategory,
       });
 
