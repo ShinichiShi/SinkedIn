@@ -46,7 +46,23 @@ export const useCreatePost = (maxChars: number) => {
           return;
         }
       }
+      let postCategory = 'personal'; // default category
+      if (postContent.trim()) {
+        try {
+          const categoryResponse = await fetch("/api/categorize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: postContent }),
+          });
 
+          if (categoryResponse.ok) {
+            const categoryData = await categoryResponse.json();
+            postCategory = categoryData.category;
+          }
+        } catch (error) {
+          console.warn("Error categorizing post, using default category:", error);
+        }
+      }
       const postsRef = collection(db, "posts");
       await addDoc(postsRef, {
         content,
@@ -59,6 +75,7 @@ export const useCreatePost = (maxChars: number) => {
         dislikedBy: [],
         shares: 0,
         comments: [],
+        category: postCategory,
       });
 
       toast.success("Your voice shall be heard");

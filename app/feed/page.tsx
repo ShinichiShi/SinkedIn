@@ -14,6 +14,7 @@ import PostHeader from "@/components/post/PostHeader";
 import PostActions from "@/components/post/PostActions";
 import CommentSection from "@/components/post/CommentSection";
 import { motion, AnimatePresence } from "framer-motion";
+import type { ReactElement, FC } from 'react';
 
 // Import custom hooks
 import { useAuth } from "@/hooks/useAuth";
@@ -21,18 +22,6 @@ import { useUserCache } from "@/hooks/useUserCache";
 import { usePosts } from "@/hooks/usePosts";
 import { usePostActions } from "@/hooks/usePostActions";
 import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
-import type { ReactElement, FC, ReactNode } from 'react';
-import {Post, Comment} from "@/types";
-
-const MotionButton = motion.button;
-
-const CustomLoader: FC<{
-  loading: boolean;
-  size: number;
-  color: string;
-}> = ({ loading, size, color }) => {
-  return <div><Loader loading={loading} size={size} color={color} /></div>;
-};
 
 export default function Feed(): ReactElement {
   const router = useRouter();
