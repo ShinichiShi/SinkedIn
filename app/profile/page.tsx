@@ -254,9 +254,9 @@ const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
   const getTabClassName = (tab: 'posts' | 'followers' | 'following') => {
     return `${
       activeTab === tab
-        ? 'border-b-2 border-white text-white'
-        : 'text-gray-400 hover:text-white border-b-2 border-transparent hover:border-gray-600'
-    } px-3 sm:px-6 py-3 text-xs sm:text-sm font-medium whitespace-nowrap transition-all cursor-pointer`;
+        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-500'
+        : 'text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-100 dark:hover:bg-gray-800 border-transparent'
+    } px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all cursor-pointer rounded-full border`;
   };
 
   if (loading) {

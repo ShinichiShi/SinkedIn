@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "categorize-posts": "node scripts/categorize-existing-posts.js"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",
@@ -44,6 +45,7 @@
     "@types/react-dom": "18.2.7",
     "@vercel/speed-insights": "^1.1.0",
     "autoprefixer": "10.4.15",
+    "axios": "^1.10.0",
     "class-variance-authority": "^0.7.1",
     "cloudinary": "^2.7.0",
     "cloudinary-core": "^2.13.1",
@@ -63,6 +65,7 @@
     "next": "13.5.1",
     "next-cloudinary": "^6.16.0",
     "next-themes": "^0.3.0",
+    "node-fetch": "^3.3.2",
     "nodemon": "^3.1.7",
     "postcss": "8.4.30",
     "react": "^18.3.1",
