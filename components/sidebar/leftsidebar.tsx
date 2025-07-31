@@ -22,6 +22,10 @@ interface UserData {
 export function LeftSidebar() {
   const [userData, setUserData] = useState<UserData | null>(null);
   const router = useRouter();
+  
+  // Use a data URL to avoid 404 errors for missing avatar files
+  const defaultAvatarDataUrl = "data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='50' cy='50' r='50' fill='%23E5E7EB'/%3E%3Ccircle cx='50' cy='35' r='15' fill='%239CA3AF'/%3E%3Cpath d='M50 55C35 55 25 65 25 75V85H75V75C75 65 65 55 50 55Z' fill='%239CA3AF'/%3E%3C/svg%3E";
+
   const fetchUserData = useCallback(async () => {
     const auth = getAuth(firebaseApp);
     const user = auth.currentUser;
@@ -40,7 +44,7 @@ export function LeftSidebar() {
           username: "Anonymous User",
           email: user.email || "user@example.com",
           bio: "Embracing failures as stepping stones to success",
-          profilepic: "/default-avatar.png",
+          profilepic: "/default-avatar.svg",
           location: "Unknown",
           followers: [],
           following: []
@@ -52,7 +56,7 @@ export function LeftSidebar() {
         username: "Anonymous User",
         email: user?.email || "user@example.com",
         bio: "Embracing failures as stepping stones to success",
-        profilepic: "/default-avatar.png",
+        profilepic: "/default-avatar.svg",
         location: "Unknown",
         followers: [],
         following: []
@@ -68,7 +72,7 @@ export function LeftSidebar() {
     username: "Anonymous User",
     email: "user@example.com",
     bio: "Embracing failures as stepping stones to success",
-    profilepic: "/default-avatar.png"
+    profilepic: "/default-avatar.svg"
   };
 
   const displayData = userData || dummyUserData;
@@ -84,7 +88,7 @@ export function LeftSidebar() {
       <div className="p-4 rounded-lg border border-border bg-card shadow-md text-center">
         <Avatar className="w-16 h-16 mx-auto mb-4">
           <AvatarImage
-            src={displayData.profilepic || "/default-avatar.png"}
+            src={displayData.profilepic || "/default-avatar.svg"}
             alt={`${displayData.username}'s avatar`}
             loading="lazy"
           />

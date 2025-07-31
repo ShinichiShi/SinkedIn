@@ -28,6 +28,7 @@ export default function Feed(): ReactElement {
   const [initialLoading, setInitialLoading] = useState(true);
   const [hasTriggeredInfiniteScroll, setHasTriggeredInfiniteScroll] = useState(false);
   const hasInitializedRef = useRef(false);
+  const fetchInitialPostsRef = useRef<(() => Promise<void>) | null>(null);
   
   // Auth hook
   const { currentUser, userFollowing, setUserFollowing, loading: authLoading } = useAuth();
@@ -47,6 +48,9 @@ export default function Feed(): ReactElement {
     loadMorePosts,
     handleTabChange
   } = usePosts(userFollowing, cachedUsers, fetchUsers);
+
+  // Store fetchInitialPosts in ref to avoid dependency issues
+  fetchInitialPostsRef.current = fetchInitialPosts;
   
   // Infinite scroll hook - only active after first manual load
   const { observerTarget } = useInfiniteScroll(
@@ -91,21 +95,28 @@ export default function Feed(): ReactElement {
   useEffect(() => {
     if (hasInitializedRef.current) return;
     
-    try {
-      const auth = getAuth(firebaseApp);
-      const user = auth.currentUser;
-      if (!user) {
-        router.push("/login");
-        return;
-      } else {
-        hasInitializedRef.current = true;
-        fetchInitialPosts().finally(() => setInitialLoading(false));
+    const initializeFeed = async () => {
+      try {
+        const auth = getAuth(firebaseApp);
+        const user = auth.currentUser;
+        if (!user) {
+          router.push("/login");
+          return;
+        } else {
+          hasInitializedRef.current = true;
+          if (fetchInitialPostsRef.current) {
+            await fetchInitialPostsRef.current();
+          }
+        }
+      } catch (error: any) {
+        toast.error("Error fetching user data:" + error.message);
+      } finally {
+        setInitialLoading(false);
       }
-    } catch (error: any) {
-      toast.error("Error fetching user data:" + error.message);
-      setInitialLoading(false);
-    }
-  }, [router, fetchInitialPosts]);
+    };
+
+    initializeFeed();
+  }, [router]); // Only depend on router to prevent infinite loops
 
   // Re-fetch posts when userFollowing changes and we're on following tab - but only after initial load
   useEffect(() => {
@@ -114,9 +125,11 @@ export default function Feed(): ReactElement {
         activeTab === 'following' && 
         !initialLoading) {
       
-      fetchInitialPosts('following');
+      if (fetchInitialPostsRef.current) {
+        fetchInitialPostsRef.current('following');
+      }
     }
-  }, [userFollowing.length, activeTab, initialLoading, fetchInitialPosts]);
+  }, [userFollowing.length, activeTab, initialLoading]); // Use ref to avoid dependency issues
 
   // Fetch profile pics for comments
   useEffect(() => {
