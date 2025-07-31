@@ -360,7 +360,7 @@ export default function UserProfile() {
                                   />
                                 ) : (
                                   <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold">
-                                    {post.userName.charAt(0).toUpperCase()}
+                                    {(post.userName || 'Anonymous').charAt(0).toUpperCase()}
                                   </div>
                                 )}
                               </div>

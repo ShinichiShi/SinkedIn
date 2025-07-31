@@ -68,14 +68,14 @@ const CommentItem = ({
         {comment.profilePic || cachedUsers.get(comment.userId)?.profilepic ? (
           <Image
             src={comment.profilePic || cachedUsers.get(comment.userId)?.profilepic}
-            alt={`${comment.userName}'s profile`}
+            alt={`${comment.userName || cachedUsers.get(comment.userId)?.username || 'User'}'s profile`}
             width={32}
             height={32}
             className="w-8 h-8 rounded-full object-cover"
           />
         ) : (
           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
-            {comment.userName.charAt(0).toUpperCase()}
+            {(comment.userName || cachedUsers.get(comment.userId)?.username || 'U').charAt(0).toUpperCase()}
           </div>
         )}
 
@@ -177,7 +177,7 @@ const CommentItem = ({
                   )}
                   <input
                     type="text"
-                    placeholder={`Reply to ${comment.userName}...`}
+                    placeholder={`Reply to ${comment.userName || cachedUsers.get(comment.userId)?.username || 'User'}...`}
                     value={replyInputs[comment.id] || ''}
                     onChange={(e) => onReplyInputChange(comment.id, e.target.value)}
                     onKeyPress={(e) => {
