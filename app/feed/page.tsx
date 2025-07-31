@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { CreatePost } from "@/components/post/create-post";
 import { LeftSidebar } from "@/components/sidebar/leftsidebar";
 import { RightSidebar } from "@/components/sidebar/rightsidebar";
@@ -21,11 +21,11 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserCache } from "@/hooks/useUserCache";
 import { usePosts } from "@/hooks/usePosts";
 import { usePostActions } from "@/hooks/usePostActions";
-import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 export default function Feed(): ReactElement {
   const router = useRouter();
   const [initialLoading, setInitialLoading] = useState(true);
+  const hasInitializedRef = useRef(false);
   
   // Auth hook
   const { currentUser, userFollowing, setUserFollowing, loading: authLoading } = useAuth();
@@ -37,11 +37,10 @@ export default function Feed(): ReactElement {
   const {
     posts,
     setPosts,
+    loading,
     hasMore,
-    loadingMore,
     activeTab,
     fetchInitialPosts,
-    loadMorePosts,
     handleTabChange
   } = usePosts(userFollowing, cachedUsers, fetchUsers);
   
@@ -60,11 +59,18 @@ export default function Feed(): ReactElement {
     handleUnfollow
   } = usePostActions(posts, setPosts, cachedUsers, setCachedUsers, setUserFollowing);
   
-  // Infinite scroll hook
-  const { observerTarget } = useInfiniteScroll(loadMorePosts, hasMore, loadingMore);
+  // Create stable refs for the fetch functions
+  const fetchInitialPostsRef = useRef<((tab?: 'foryou' | 'following') => Promise<void>) | null>(null);
+  fetchInitialPostsRef.current = fetchInitialPosts;
+  const lastFetchedTabRef = useRef<string | null>(null);
+  const lastCommentFetchRef = useRef<number>(0);
+  
 
-  // Initial data loading
+
+  // Initial data loading - only run once
   useEffect(() => {
+    if (hasInitializedRef.current) return;
+    
     try {
       const auth = getAuth(firebaseApp);
       const user = auth.currentUser;
@@ -72,28 +78,47 @@ export default function Feed(): ReactElement {
         router.push("/login");
         return;
       } else {
-        fetchInitialPosts().finally(() => setInitialLoading(false));
+        hasInitializedRef.current = true;
+        fetchInitialPostsRef.current?.().finally(() => setInitialLoading(false));
       }
     } catch (error: any) {
       toast.error("Error fetching user data:" + error.message);
       setInitialLoading(false);
     }
-  }, [router, fetchInitialPosts]);
+  }, [router]);
 
-  // Re-fetch posts when userFollowing changes and we're on following tab
+  // Re-fetch posts when userFollowing changes and we're on following tab - but only after initial load
   useEffect(() => {
-    if (userFollowing.length > 0 && activeTab === 'following' && !initialLoading) {
-      fetchInitialPosts('following');
+    const currentKey = `${activeTab}-${userFollowing.length}`;
+    if (hasInitializedRef.current && 
+        userFollowing.length > 0 && 
+        activeTab === 'following' && 
+        !initialLoading && 
+        lastFetchedTabRef.current !== currentKey) {
+      
+      lastFetchedTabRef.current = currentKey;
+      fetchInitialPostsRef.current?.('following');
     }
-  }, [userFollowing, activeTab, initialLoading, fetchInitialPosts]);
+  }, [userFollowing.length, activeTab, initialLoading]);
 
   // Fetch profile pics for comments
   useEffect(() => {
     const fetchAllCommentProfilePics = async () => {
+      const now = Date.now();
+      // Debounce: don't fetch if we've fetched within the last 2 seconds
+      if (now - lastCommentFetchRef.current < 2000) {
+        console.log("Skipping comment profile pic fetch - too soon since last fetch");
+        return;
+      }
+      
       const allComments = posts.flatMap(post => post.comments || []);
       if (allComments.length > 0) {
         const commentUserIds = Array.from(new Set(allComments.map(comment => comment.userId)));
-        await fetchUsers(commentUserIds);
+        console.log(`Fetching profile pics for ${commentUserIds.length} comment users`);
+        
+        lastCommentFetchRef.current = now;
+        // Limit comment user fetching to 30 users at a time to avoid overwhelming the system
+        await fetchUsers(commentUserIds, 30);
       }
     };
 
@@ -213,18 +238,8 @@ export default function Feed(): ReactElement {
                 ))}
               </AnimatePresence>
 
-              {/* Loading More Indicator */}
-              {loadingMore && (
-                <div className="flex justify-center py-8">
-                  <Loader loading={loadingMore} size={30} color="#3b82f6" />
-                </div>
-              )}
-
-              {/* Load More Trigger */}
-              <div ref={observerTarget} className="h-10" />
-
               {/* End of Feed Message */}
-              {!hasMore && posts.length > 0 && (
+              {!loading && posts.length > 0 && (
                 <div className="text-center pb-14">
                   <p className="text-gray-500 dark:text-gray-400">
                     You&apos;ve reached the end of your feed...How jobless can you be -_-
