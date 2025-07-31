@@ -21,10 +21,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { useUserCache } from "@/hooks/useUserCache";
 import { usePosts } from "@/hooks/usePosts";
 import { usePostActions } from "@/hooks/usePostActions";
+import { useInfiniteScroll } from "@/hooks/useInfiniteScroll";
 
 export default function Feed(): ReactElement {
   const router = useRouter();
   const [initialLoading, setInitialLoading] = useState(true);
+  const [hasTriggeredInfiniteScroll, setHasTriggeredInfiniteScroll] = useState(false);
   const hasInitializedRef = useRef(false);
   
   // Auth hook
@@ -38,11 +40,21 @@ export default function Feed(): ReactElement {
     posts,
     setPosts,
     loading,
+    loadingMore,
     hasMore,
     activeTab,
     fetchInitialPosts,
+    loadMorePosts,
     handleTabChange
   } = usePosts(userFollowing, cachedUsers, fetchUsers);
+  
+  // Infinite scroll hook - only active after first manual load
+  const { observerTarget } = useInfiniteScroll(
+    loadMorePosts, 
+    hasMore && hasTriggeredInfiniteScroll, // Only enable infinite scroll after first manual load
+    loadingMore, 
+    posts.length
+  );
   
   // Post actions hook
   const {
@@ -59,10 +71,18 @@ export default function Feed(): ReactElement {
     handleUnfollow
   } = usePostActions(posts, setPosts, cachedUsers, setCachedUsers, setUserFollowing);
   
-  // Create stable refs for the fetch functions
-  const fetchInitialPostsRef = useRef<((tab?: 'foryou' | 'following') => Promise<void>) | null>(null);
-  fetchInitialPostsRef.current = fetchInitialPosts;
-  const lastFetchedTabRef = useRef<string | null>(null);
+  // Handle manual load more and enable infinite scroll
+  const handleManualLoadMore = async () => {
+    await loadMorePosts();
+    setHasTriggeredInfiniteScroll(true); // Enable infinite scroll after first manual load
+  };
+
+  // Reset infinite scroll state when tab changes
+  const handleTabChangeWithReset = (tab: 'foryou' | 'following') => {
+    setHasTriggeredInfiniteScroll(false); // Reset infinite scroll state
+    handleTabChange(tab);
+  };
+  
   const lastCommentFetchRef = useRef<number>(0);
   
 
@@ -79,27 +99,24 @@ export default function Feed(): ReactElement {
         return;
       } else {
         hasInitializedRef.current = true;
-        fetchInitialPostsRef.current?.().finally(() => setInitialLoading(false));
+        fetchInitialPosts().finally(() => setInitialLoading(false));
       }
     } catch (error: any) {
       toast.error("Error fetching user data:" + error.message);
       setInitialLoading(false);
     }
-  }, [router]);
+  }, [router, fetchInitialPosts]);
 
   // Re-fetch posts when userFollowing changes and we're on following tab - but only after initial load
   useEffect(() => {
-    const currentKey = `${activeTab}-${userFollowing.length}`;
     if (hasInitializedRef.current && 
         userFollowing.length > 0 && 
         activeTab === 'following' && 
-        !initialLoading && 
-        lastFetchedTabRef.current !== currentKey) {
+        !initialLoading) {
       
-      lastFetchedTabRef.current = currentKey;
-      fetchInitialPostsRef.current?.('following');
+      fetchInitialPosts('following');
     }
-  }, [userFollowing.length, activeTab, initialLoading]);
+  }, [userFollowing.length, activeTab, initialLoading, fetchInitialPosts]);
 
   // Fetch profile pics for comments
   useEffect(() => {
@@ -158,7 +175,7 @@ export default function Feed(): ReactElement {
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                   <div className="flex">
                     <button
-                      onClick={() => handleTabChange('foryou')}
+                      onClick={() => handleTabChangeWithReset('foryou')}
                       className={`flex-1 py-3 px-4 text-sm font-medium transition-colors duration-200 ${
                         activeTab === 'foryou'
                           ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
@@ -168,7 +185,7 @@ export default function Feed(): ReactElement {
                       For you
                     </button>
                     <button
-                      onClick={() => handleTabChange('following')}
+                      onClick={() => handleTabChangeWithReset('following')}
                       className={`flex-1 py-3 px-4 text-sm font-medium transition-colors duration-200 ${
                         activeTab === 'following'
                           ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400'
@@ -238,8 +255,47 @@ export default function Feed(): ReactElement {
                 ))}
               </AnimatePresence>
 
+              {/* Loading More Indicator */}
+              {loadingMore && (
+                <div className="text-center py-8">
+                  <Loader loading={true} size={30} color="#3b82f6" />
+                  <p className="text-gray-500 dark:text-gray-400 text-sm mt-2">
+                    Loading more posts...
+                  </p>
+                </div>
+              )}
+
+              {/* Manual Load More Button - Shows initially */}
+              {hasMore && !loadingMore && posts.length > 0 && !hasTriggeredInfiniteScroll && (
+                <div className="text-center py-8">
+                  <button
+                    onClick={handleManualLoadMore}
+                    className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-3 px-8 rounded-full shadow-md hover:shadow-lg transform hover:scale-105 transition-all duration-200"
+                  >
+                    Load More Posts
+                  </button>
+                  <p className="text-gray-500 dark:text-gray-400 text-xs mt-3">
+                    After clicking, new posts will load automatically as you scroll
+                  </p>
+                </div>
+              )}
+
+              {/* Infinite Scroll Trigger - Shows after first manual load */}
+              {hasMore && !loadingMore && posts.length > 0 && hasTriggeredInfiniteScroll && (
+                <div ref={observerTarget} className="h-20 flex items-center justify-center">
+                  <div className="text-gray-400 dark:text-gray-500 text-sm animate-pulse">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                      <span className="ml-2">Scroll for more posts...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* End of Feed Message */}
-              {!loading && posts.length > 0 && (
+              {!loading && !hasMore && posts.length > 0 && (
                 <div className="text-center pb-14">
                   <p className="text-gray-500 dark:text-gray-400">
                     You&apos;ve reached the end of your feed...How jobless can you be -_-
