@@ -17,8 +17,10 @@ import { MessageCircle, ThumbsDown, Link2, ArrowLeft, MoreHorizontal, Clock } fr
 import { LeftSidebar } from "@/components/sidebar/leftsidebar";
 import { formatRelativeTime as formatTime } from "@/utils/timeUtils";
 import { RightSidebar } from "@/components/sidebar/rightsidebar";
-import { Comment,Post } from "@/types";
+import { Comment, Post } from "@/types";
 
+// Import the useAuth hook
+import { useAuth } from "@/hooks/useAuth";
 
 interface UserData {
   username: string;
@@ -35,6 +37,9 @@ const PostPage = () => {
   const [cachedUsers, setCachedUsers] = useState<Map<string, UserData>>(new Map());
   const [showComments, setShowComments] = useState(true);
   const [currentUserData, setCurrentUserData] = useState<UserData | null>(null);
+
+  // Use the useAuth hook to get user data consistently with Feed component
+  const { currentUser, userData, userFollowing, loading: authLoading } = useAuth();
 
   // Function to get default profile picture with first letter of username
   const getDefaultProfilePic = (username: string) => {
@@ -343,7 +348,7 @@ const PostPage = () => {
     }
   };
 
-  if (loading) {
+  if (loading || authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex justify-center items-center">
         <HashLoader size={50} color="#3b82f6" />
@@ -380,7 +385,11 @@ const PostPage = () => {
       <div className="flex max-w-7xl mx-auto">
         {/* Left Sidebar */}
         <aside className="hidden lg:block w-64">
-          <LeftSidebar />
+          <LeftSidebar 
+            currentUser={currentUser}
+            userData={userData}
+            userFollowing={userFollowing}
+          />
         </aside>
         
         {/* Main Content */}

@@ -1,10 +1,10 @@
-// app/api/posts/[postId]/route.ts
+// app/api/posts/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { admin,adminDb } from '@/lib/firebase-admin';
 import { getAuth } from 'firebase-admin/auth';
 export async function GET(
   request: NextRequest,
-  { params }: { params: { postId: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     const token = request.headers.get('authorization')?.replace('Bearer ', '');
@@ -14,7 +14,7 @@ export async function GET(
 
     await getAuth().verifyIdToken(token);
     
-    const postDoc = await adminDb.collection('posts').doc(params.postId).get();
+    const postDoc = await adminDb.collection('posts').doc(params.id).get();
     
     if (!postDoc.exists) {
       return NextResponse.json({ error: 'Post not found' }, { status: 404 });
