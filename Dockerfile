@@ -1,14 +1,6 @@
 # Use Node.js LTS as the base image
 FROM node:18-alpine
 
-# Define build arguments
-ARG FIREBASE_API_KEY
-ARG FIREBASE_AUTH_DOMAIN
-ARG FIREBASE_PROJECT_ID
-ARG FIREBASE_STORAGE_BUCKET
-ARG FIREBASE_MESSAGING_SENDER_ID
-ARG FIREBASE_APP_ID
-
 # Set working directory
 WORKDIR /app
 

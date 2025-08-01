@@ -3,6 +3,7 @@ login issues...see without loggin in
 tags adding display in posts
 redis 
 db migrate to postgres
+add subcollection in comments instead of arrays
 feed generation system for following tab : 
     Long-term Recommendation
     For a production app with many users following many people, consider implementing a feed generation system:
@@ -36,8 +37,26 @@ Routes :
 - hooks.useUserCache
 - hooks/useUserProfile
 
+Posts API:
 
----
+GET /api/posts - Fetch posts with pagination and filtering
+POST /api/posts/create - Create new posts
+GET /api/posts/[postId] - Get individual post
+PATCH /api/posts/[postId]/delete - Soft delete posts
+PATCH /api/posts/[postId]/like - Like/unlike posts
+PATCH /api/posts/[postId]/dislike - Dislike/undislike posts
+PATCH /api/posts/[postId]/share - Update share count
+POST /api/posts/[postId]/comment - Add comments
+
+Users API:
+
+GET /api/users/[userId] - Get user profile
+GET /api/users/[userId]/posts - Get user's posts
+POST /api/users/[userId]/follow - Follow user
+DELETE /api/users/[userId]/follow - Unfollow user
+POST /api/users/batch - Batch fetch multiple users
+
+---      
 1. Structure Your Collections Smartly
 Current (simple)
 ```

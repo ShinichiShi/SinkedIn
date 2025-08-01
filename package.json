@@ -59,6 +59,7 @@
     "eslint-config-next": "13.5.1",
     "express": "^4.21.1",
     "firebase": "^11.10.0",
+    "firebase-admin": "^13.4.0",
     "framer-motion": "^11.18.2",
     "input-otp": "^1.4.1",
     "lucide-react": "^0.446.0",

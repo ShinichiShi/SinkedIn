@@ -17,7 +17,7 @@ const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
 if (isDev && useEmulator && typeof window !== "undefined" && location.hostname === "localhost") {
   connectFirestoreEmulator(db, "localhost", 8080);
-  connectAuthEmulator(auth, "http://localhost:9099"); // Uncomment only if using fake login
+  //connectAuthEmulator(auth, "http://localhost:9099"); // Uncomment only if using fake login
   console.warn("🔥 Running Firestore on Emulator (Auth Emulator disabled due to Google login limitation)");
 }
 

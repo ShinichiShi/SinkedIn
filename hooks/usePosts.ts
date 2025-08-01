@@ -1,15 +1,7 @@
+
+// hooks/usePosts.ts (Updated)
 import { useState, useCallback, useRef } from 'react';
-import { 
-  collection, 
-  query, 
-  orderBy, 
-  getDocs, 
-  where,
-  limit,
-  startAfter,
-  DocumentSnapshot
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { auth } from '@/lib/firebase';
 import { Post } from '@/types';
 import { toast } from 'react-toastify';
 
@@ -23,9 +15,17 @@ export const usePosts = (userFollowing: string[], userCache: Map<string, any>, f
   const [loadingMore, setLoadingMore] = useState(false);
   const [activeTab, setActiveTab] = useState<'foryou' | 'following'>('foryou');
   const [hasMore, setHasMore] = useState(true);
-  const [lastVisible, setLastVisible] = useState<DocumentSnapshot | null>(null);
+  const [currentPage, setCurrentPage] = useState(0);
   const isLoadingRef = useRef(false);
   const isLoadingMoreRef = useRef(false);
+
+  const getAuthToken = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      throw new Error('User not authenticated');
+    }
+    return await currentUser.getIdToken();
+  };
 
   const processPostsWithUserData = useCallback(async (postsData: Post[]) => {
     try {
@@ -33,7 +33,6 @@ export const usePosts = (userFollowing: string[], userCache: Map<string, any>, f
       const allUserIds = Array.from(new Set(postsData.map((post: Post) => post.userId)));
       console.log("Unique user IDs to fetch:", allUserIds.length);
       
-      // Limit post user fetching to 100 users at a time to avoid overwhelming the system
       const updatedUserCache = await fetchUsers(allUserIds, 100);
       console.log("Updated user cache size:", updatedUserCache.size);
       
@@ -51,14 +50,13 @@ export const usePosts = (userFollowing: string[], userCache: Map<string, any>, f
     } catch (error) {
       console.error("Error in processPostsWithUserData:", error);
       toast.error("Error processing posts with user data");
-      return postsData; // Return original posts if processing fails
+      return postsData;
     }
   }, [fetchUsers]);
 
   const fetchInitialPosts = useCallback(async (tab: 'foryou' | 'following' = activeTab) => {
     console.log("🚀 fetchInitialPosts called with tab:", tab, "isLoadingRef.current:", isLoadingRef.current);
     
-    // Use ref to prevent multiple concurrent calls
     if (isLoadingRef.current) {
       console.log("⚠️ fetchInitialPosts: Already loading, returning early");
       return;
@@ -69,62 +67,35 @@ export const usePosts = (userFollowing: string[], userCache: Map<string, any>, f
     console.log(`🔄 fetchInitialPosts: Starting to fetch initial ${POSTS_PER_PAGE} posts for tab:`, tab);
     
     try {
-      let postsQuery;
-      
-      if (tab === 'following') {
-        console.log("fetchInitialPosts: Processing following tab, userFollowing length:", userFollowing.length);
-        
-        if (userFollowing.length === 0) {
-          console.log("fetchInitialPosts: No users being followed, setting empty state");
-          setPosts([]);
-          setHasMore(false);
-          setLastVisible(null);
-          return;
-        }
-        
-        // Fetch initial posts from followed users (limited to 20)
-        postsQuery = query(
-          collection(db, "posts"),
-          where("userId", "in", userFollowing.slice(0, 10)), // Take first 10 users only (Firestore limit)
-          orderBy("timestamp", "desc"),
-          limit(POSTS_PER_PAGE)
-        );
-        
-      } else {
-        console.log("fetchInitialPosts: Processing foryou tab - loading initial posts");
-        
-        // Fetch initial posts for 'foryou' tab (limited to 20)
-        postsQuery = query(
-          collection(db, "posts"),
-          orderBy("timestamp", "desc"),
-          limit(POSTS_PER_PAGE)
-        );
+      const token = await getAuthToken();
+      const params = new URLSearchParams({
+        tab,
+        page: '0',
+        limit: POSTS_PER_PAGE.toString(),
+      });
+
+      if (tab === 'following' && userFollowing.length > 0) {
+        params.append('following', userFollowing.join(','));
       }
+
+      const response = await fetch(`/api/posts?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch posts');
+      }
+
+      const { posts: postsData, hasMore: moreAvailable } = await response.json();
+      console.log("fetchInitialPosts: API returned", postsData.length, "posts");
       
-      const documentSnapshots = await getDocs(postsQuery);
-      console.log("fetchInitialPosts: Query returned", documentSnapshots.docs.length, "posts");
+      setHasMore(moreAvailable);
+      setCurrentPage(0);
       
-      const postsData = documentSnapshots.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Post[];
-      
-      // Filter out deleted posts on the client side
-      const filteredPosts = postsData.filter(post => !post.deleted);
-      console.log("fetchInitialPosts: Filtered out deleted posts, remaining:", filteredPosts.length);
-      
-      // Set last visible document for pagination
-      const lastDoc = documentSnapshots.docs[documentSnapshots.docs.length - 1];
-      setLastVisible(lastDoc || null);
-      
-      // Check if we have more posts to load - if we got exactly POSTS_PER_PAGE, there might be more
-      setHasMore(documentSnapshots.docs.length === POSTS_PER_PAGE);
-      
-      console.log(`🎯 fetchInitialPosts: hasMore set to ${documentSnapshots.docs.length === POSTS_PER_PAGE}, got ${documentSnapshots.docs.length} docs`);
-      
-      console.log(`fetchInitialPosts: Fetched ${filteredPosts.length} initial posts for ${tab} tab`);
-      
-      const processedPosts = await processPostsWithUserData(filteredPosts);
+      const processedPosts = await processPostsWithUserData(postsData);
       console.log("fetchInitialPosts: Processed posts, setting state");
       
       setPosts(processedPosts);
@@ -132,7 +103,7 @@ export const usePosts = (userFollowing: string[], userCache: Map<string, any>, f
       
     } catch (error) {
       console.error("fetchInitialPosts: Error fetching posts:", error);
-      toast.error("Error loading posts");
+      toast.error(error instanceof Error ? error.message : "Error loading posts");
       setHasMore(false);
     } finally {
       isLoadingRef.current = false;
@@ -146,10 +117,10 @@ export const usePosts = (userFollowing: string[], userCache: Map<string, any>, f
       hasMore,
       loadingMore,
       postsLength: posts.length,
-      lastVisible: !!lastVisible
+      currentPage
     });
     
-    if (!hasMore || isLoadingMoreRef.current || !lastVisible) {
+    if (!hasMore || isLoadingMoreRef.current) {
       console.log("loadMorePosts: Conditions not met for loading more");
       return;
     }
@@ -159,62 +130,43 @@ export const usePosts = (userFollowing: string[], userCache: Map<string, any>, f
     console.log("loadMorePosts: Starting to fetch more posts");
     
     try {
-      let postsQuery;
-      
-      if (activeTab === 'following') {
-        if (userFollowing.length === 0) {
-          console.log("loadMorePosts: No users being followed");
-          setHasMore(false);
-          return;
-        }
-        
-        // Fetch more posts from followed users
-        postsQuery = query(
-          collection(db, "posts"),
-          where("userId", "in", userFollowing.slice(0, 10)),
-          orderBy("timestamp", "desc"),
-          startAfter(lastVisible),
-          limit(POSTS_PER_PAGE)
-        );
-        
-      } else {
-        // Fetch more posts for 'foryou' tab
-        postsQuery = query(
-          collection(db, "posts"),
-          orderBy("timestamp", "desc"),
-          startAfter(lastVisible),
-          limit(POSTS_PER_PAGE)
-        );
+      const token = await getAuthToken();
+      const nextPage = currentPage + 1;
+      const params = new URLSearchParams({
+        tab: activeTab,
+        page: nextPage.toString(),
+        limit: POSTS_PER_PAGE.toString(),
+      });
+
+      if (activeTab === 'following' && userFollowing.length > 0) {
+        params.append('following', userFollowing.join(','));
       }
+
+      const response = await fetch(`/api/posts?${params}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to fetch more posts');
+      }
+
+      const { posts: morePosts, hasMore: moreAvailable } = await response.json();
+      console.log("loadMorePosts: API returned", morePosts.length, "more posts");
       
-      const documentSnapshots = await getDocs(postsQuery);
-      console.log("loadMorePosts: Query returned", documentSnapshots.docs.length, "more posts");
-      
-      if (documentSnapshots.docs.length === 0) {
+      if (morePosts.length === 0) {
         setHasMore(false);
         console.log("loadMorePosts: No more posts available");
         return;
       }
       
-      const morePosts = documentSnapshots.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as Post[];
+      setHasMore(moreAvailable);
+      setCurrentPage(nextPage);
       
-      // Filter out deleted posts on the client side
-      const filteredMorePosts = morePosts.filter(post => !post.deleted);
-      console.log("loadMorePosts: Filtered out deleted posts, remaining:", filteredMorePosts.length);
+      const processedMorePosts = await processPostsWithUserData(morePosts);
       
-      // Update last visible document
-      const lastDoc = documentSnapshots.docs[documentSnapshots.docs.length - 1];
-      setLastVisible(lastDoc);
-      
-      // Check if we have more posts to load
-      setHasMore(documentSnapshots.docs.length === POSTS_PER_PAGE);
-      
-      const processedMorePosts = await processPostsWithUserData(filteredMorePosts);
-      
-      // Append new posts to existing posts
       setPosts(prevPosts => {
         const existingIds = new Set(prevPosts.map(p => p.id));
         const newPosts = processedMorePosts.filter(p => !existingIds.has(p.id));
@@ -224,13 +176,13 @@ export const usePosts = (userFollowing: string[], userCache: Map<string, any>, f
       
     } catch (error) {
       console.error("loadMorePosts: Error fetching more posts:", error);
-      toast.error("Error loading more posts");
+      toast.error(error instanceof Error ? error.message : "Error loading more posts");
     } finally {
       isLoadingMoreRef.current = false;
       setLoadingMore(false);
       console.log("loadMorePosts: Completed");
     }
-  }, [activeTab, userFollowing, hasMore, lastVisible, posts.length, loadingMore, processPostsWithUserData]);
+  }, [activeTab, userFollowing, hasMore, currentPage, processPostsWithUserData]);
 
   const handleTabChange = useCallback((tab: 'foryou' | 'following') => {
     if (tab === activeTab || isLoadingRef.current) return;
@@ -240,7 +192,7 @@ export const usePosts = (userFollowing: string[], userCache: Map<string, any>, f
     setActiveTab(tab);
     setPosts([]);
     setHasMore(true);
-    setLastVisible(null);
+    setCurrentPage(0);
     
     fetchInitialPosts(tab);
   }, [activeTab, fetchInitialPosts]);
@@ -252,7 +204,6 @@ export const usePosts = (userFollowing: string[], userCache: Map<string, any>, f
     loadingMore,
     activeTab,
     hasMore,
-    lastVisible,
     fetchInitialPosts,
     loadMorePosts,
     handleTabChange

@@ -45,7 +45,8 @@ git clone https://github.com/vaibhavgarg25/SinkedIn.git
 cd sinkedin
 
 npm install
-
+npm install -g firebase-tools
+firebase emulators:start --only firestore,storage
 npm run dev
 ```
 # Contributing
