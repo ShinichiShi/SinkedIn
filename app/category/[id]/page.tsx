@@ -434,7 +434,7 @@ export default function CategoryPage({ params }: { params: { id: string } }) {
         {/* End of posts indicator */}
         {!loading && !loadingMore && posts.length > 0 && !hasMore && (
           <div className="text-center py-8">
-            <p className="text-muted-foreground">You've reached the end of this category</p>
+            <p className="text-muted-foreground">You&apos;ve reached the end of this category</p>
           </div>
         )}
       </div>

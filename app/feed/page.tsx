@@ -116,7 +116,7 @@ export default function Feed(): ReactElement {
     };
 
     initializeFeed();
-  }, [router]); // Only depend on router to prevent infinite loops
+  }, [router]); 
 
   // Re-fetch posts when userFollowing changes and we're on following tab - but only after initial load
   useEffect(() => {
@@ -129,7 +129,7 @@ export default function Feed(): ReactElement {
         fetchInitialPostsRef.current();
       }
     }
-  }, [userFollowing.length, activeTab, initialLoading]); // Use ref to avoid dependency issues
+  }, [userFollowing.length, activeTab, initialLoading]);
 
   // Fetch profile pics for comments
   useEffect(() => {
