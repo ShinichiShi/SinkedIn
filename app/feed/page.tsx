@@ -126,7 +126,7 @@ export default function Feed(): ReactElement {
         !initialLoading) {
       
       if (fetchInitialPostsRef.current) {
-        fetchInitialPostsRef.current('following');
+        fetchInitialPostsRef.current();
       }
     }
   }, [userFollowing.length, activeTab, initialLoading]); // Use ref to avoid dependency issues
