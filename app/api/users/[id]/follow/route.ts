@@ -51,7 +51,7 @@ export async function POST(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
     const token = request.headers.get('authorization')?.replace('Bearer ', '');
@@ -60,7 +60,7 @@ export async function DELETE(
     }
 
     const decodedToken = await getAuth().verifyIdToken(token);
-    const targetUserId = params.userId;
+    const targetUserId = params.id;
 
     await adminDb.runTransaction(async (transaction) => {
       const currentUserRef = adminDb.collection('users').doc(decodedToken.uid);

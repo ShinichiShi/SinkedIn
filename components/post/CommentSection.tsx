@@ -1,12 +1,12 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { Post, Comment } from "@/types";
 import { formatRelativeTime } from "@/utils/timeUtils";
 import Link from "next/link";
 import { Send, Reply, Trash2, MoreVertical, MessageCircle } from "lucide-react";
-import { doc, updateDoc, getDoc, onSnapshot } from "firebase/firestore";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "react-toastify";
 
@@ -245,28 +245,12 @@ export default function CommentSection({
 }: CommentSectionProps) {
   const [replyInputs, setReplyInputs] = useState<{ [key: string]: string }>({});
   const [showReplyInput, setShowReplyInput] = useState<{ [key: string]: boolean }>({});
-  const [currentPost, setCurrentPost] = useState<Post>(post);
 
-  // Listen for real-time updates to the post
-  useEffect(() => {
-    if (!post.id) return;
-
-    const unsubscribe = onSnapshot(doc(db, "posts", post.id), (doc) => {
-      if (doc.exists()) {
-        const updatedPost = { id: doc.id, ...doc.data() } as Post;
-        setCurrentPost(updatedPost);
-        // Notify parent component of the update
-        if (onPostUpdate) {
-          onPostUpdate(updatedPost);
-        }
-      }
-    });
-
-    return () => unsubscribe();
-  }, [post.id, onPostUpdate]);
+  // Removed real-time onSnapshot listener - comments will be updated via parent component or API calls
+  // This eliminates redundant Firebase calls
 
   // Recursive function to mark comment and all its replies as deleted
-const markCommentAndRepliesDeleted = (comments: Comment[], targetId: string): Comment[] => {
+  const markCommentAndRepliesDeleted = (comments: Comment[], targetId: string): Comment[] => {
     return comments.map(comment => {
       if (comment.id === targetId) {
         return {
@@ -301,7 +285,7 @@ const markCommentAndRepliesDeleted = (comments: Comment[], targetId: string): Co
       const postRef = doc(db, "posts", post.id);
       
       // Mark the comment and all its replies as deleted
-      const updatedComments = markCommentAndRepliesDeleted(currentPost.comments || [], commentId);
+      const updatedComments = markCommentAndRepliesDeleted(post.comments || [], commentId);
 
       // Clean the comments to remove any undefined values before updating
       const cleanedComments = cleanCommentsForFirebase(updatedComments);
@@ -310,13 +294,22 @@ const markCommentAndRepliesDeleted = (comments: Comment[], targetId: string): Co
         comments: cleanedComments
       });
 
+      // Notify parent component of the update if callback provided
+      if (onPostUpdate) {
+        onPostUpdate({
+          ...post,
+          comments: cleanedComments
+        });
+      }
+
       toast.success("Comment deleted successfully");
     } catch (error) {
       console.error("Error deleting comment:", error);
       toast.error("Failed to delete comment");
     }
   };
-// Helper function to clean comments and remove undefined values
+
+  // Helper function to clean comments and remove undefined values
   const cleanCommentsForFirebase = (comments: Comment[]): Comment[] => {
     return comments.map(comment => {
       const cleanedComment: any = {
@@ -351,6 +344,7 @@ const markCommentAndRepliesDeleted = (comments: Comment[], targetId: string): Co
       return cleanedComment;
     });
   };
+
   const handleReply = (commentId: string) => {
     setShowReplyInput(prev => ({
       ...prev,
@@ -396,11 +390,20 @@ const markCommentAndRepliesDeleted = (comments: Comment[], targetId: string): Co
       };
 
       // Add reply to the specific parent comment
-      const updatedComments = addReplyToSpecificComment(currentPost.comments || [], parentCommentId, newReply);
+      const updatedComments = addReplyToSpecificComment(post.comments || [], parentCommentId, newReply);
+      const cleanedComments = cleanCommentsForFirebase(updatedComments);
 
       await updateDoc(postRef, {
-        comments: updatedComments
+        comments: cleanedComments
       });
+
+      // Notify parent component of the update if callback provided
+      if (onPostUpdate) {
+        onPostUpdate({
+          ...post,
+          comments: cleanedComments
+        });
+      }
 
       // Clear reply input and hide reply box
       setReplyInputs(prev => ({ ...prev, [parentCommentId]: "" }));
@@ -436,7 +439,7 @@ const markCommentAndRepliesDeleted = (comments: Comment[], targetId: string): Co
   };
 
   // Filter out deleted comments completely
-  const activeComments = currentPost.comments?.filter(comment => !comment.deleted) || [];
+  const activeComments = post.comments?.filter(comment => !comment.deleted) || [];
 
   return (
     <AnimatePresence>

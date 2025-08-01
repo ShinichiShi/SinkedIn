@@ -3,12 +3,13 @@ import { doc, getDoc } from "firebase/firestore";
 import { db, auth } from "@/lib/firebase";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { UserData } from "@/types/index"; 
+import { UserData } from "@/types/index";
 
 export const useAuth = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [currentUserProfilePic, setCurrentUserProfilePic] = useState("");
   const [userFollowing, setUserFollowing] = useState<string[]>([]);
+  const [userData, setUserData] = useState<UserData | null>(null); 
   const [loading, setLoading] = useState(true);
   const [authInitialized, setAuthInitialized] = useState(false);
   const router = useRouter();
@@ -27,12 +28,13 @@ export const useAuth = () => {
         throw new Error("User document does not exist");
       }
 
-      const userData = docSnap.data() as UserData;
-      setCurrentUser({ ...user, uid: user.uid }); 
-      setUserFollowing(userData?.following || []);
-      
+      const fetchedUserData = docSnap.data() as UserData;
+      setUserData(fetchedUserData); // ✅ store userData in state
+      setCurrentUser({ ...user, uid: user.uid });
+      setUserFollowing(fetchedUserData?.following || []);
+
       setCurrentUserProfilePic(
-        userData?.profilepic ||
+        fetchedUserData?.profilepic ||
           "https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_960_720.png"
       );
     } catch (error) {
@@ -51,18 +53,16 @@ export const useAuth = () => {
         fetchCurrentUserProfile(user);
       } else {
         setCurrentUser(null);
+        setUserData(null); 
         setUserFollowing([]);
         setCurrentUserProfilePic("");
         setLoading(false);
-        
-        // Only redirect to login if auth has been initialized
-        // This prevents redirect during initial auth check
+
         if (authInitialized) {
           router.push("/login");
         }
       }
-      
-      // Mark auth as initialized after first callback
+
       if (!authInitialized) {
         setAuthInitialized(true);
       }
@@ -76,7 +76,8 @@ export const useAuth = () => {
     currentUserProfilePic,
     userFollowing,
     setUserFollowing,
+    userData,
     loading,
-    authInitialized
+    authInitialized,
   };
 };

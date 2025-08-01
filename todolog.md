@@ -28,14 +28,7 @@ Routes :
 - app/network
 - app/post/{id}
 - app/login
-- components/post commentSection.tsx
-- components/profile user-list-item.tsx
-- leftsidebar.tsx components/sidebar
-- hooks.useAuth
-- hooks/usePostactions
-- hooks/usePosts
-- hooks.useUserCache
-- hooks/useUserProfile
+
 
 Posts API:
 
@@ -43,7 +36,6 @@ GET /api/posts - Fetch posts with pagination and filtering
 POST /api/posts/create - Create new posts
 GET /api/posts/[postId] - Get individual post
 PATCH /api/posts/[postId]/delete - Soft delete posts
-PATCH /api/posts/[postId]/like - Like/unlike posts
 PATCH /api/posts/[postId]/dislike - Dislike/undislike posts
 PATCH /api/posts/[postId]/share - Update share count
 POST /api/posts/[postId]/comment - Add comments

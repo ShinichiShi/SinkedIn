@@ -30,8 +30,8 @@ export default function Feed(): ReactElement {
   const hasInitializedRef = useRef(false);
   const fetchInitialPostsRef = useRef<(() => Promise<void>) | null>(null);
   
-  // Auth hook
-  const { currentUser, userFollowing, setUserFollowing, loading: authLoading } = useAuth();
+  // Auth hook - now provides userData as well
+  const { currentUser, userData, userFollowing, setUserFollowing, loading: authLoading } = useAuth();
   
   // User cache hook
   const { cachedUsers, setCachedUsers, fetchUsers } = useUserCache();
@@ -88,8 +88,15 @@ export default function Feed(): ReactElement {
   };
   
   const lastCommentFetchRef = useRef<number>(0);
-  
 
+  // Handle post updates from CommentSection
+  const handlePostUpdate = (updatedPost: any) => {
+    setPosts(prevPosts => 
+      prevPosts.map(post => 
+        post.id === updatedPost.id ? updatedPost : post
+      )
+    );
+  };
 
   // Initial data loading - only run once
   useEffect(() => {
@@ -168,10 +175,14 @@ export default function Feed(): ReactElement {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="flex max-w-7xl mx-auto">
-        {/* Left Sidebar */}
+        {/* Left Sidebar - Now optimized with props */}
         <aside className="hidden lg:block w-64 flex-shrink-0">
           <div className="sticky top-0 h-screen overflow-y-auto">
-            <LeftSidebar />
+            <LeftSidebar 
+              currentUser={currentUser}
+              userData={userData}
+              userFollowing={userFollowing}
+            />
           </div>
         </aside>
       
@@ -263,6 +274,7 @@ export default function Feed(): ReactElement {
                       onPostComment={handlePostComment}
                       commentInput={commentInputs[post.id]}
                       commentBoxStates={commentBoxStates}
+                      onPostUpdate={handlePostUpdate}
                      />         
                   </motion.div>
                 ))}

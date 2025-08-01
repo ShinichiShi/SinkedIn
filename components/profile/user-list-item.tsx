@@ -5,18 +5,8 @@ import { Avatar, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-
-interface UserData {
-  username: string;
-  email: string;
-  bio?: string;
-  profilepic?: string;
-  id: string;
-  followers?: string[];
-  following?: string[];
-}
+import { getAuth } from "firebase/auth";
+import { UserData } from "@/types/index";
 
 export function UserListItem({ userId }: { userId: string }) {
   const [user, setUser] = useState<UserData | null>(null);
@@ -24,14 +14,29 @@ export function UserListItem({ userId }: { userId: string }) {
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const userDoc = await getDoc(doc(db, "users", userId));
-        if (userDoc.exists()) {
-          setUser({ id: userDoc.id, ...userDoc.data() } as UserData);
-        }
+        const auth = getAuth();
+        const currentUser = auth.currentUser;
+
+        if (!currentUser) return; 
+        
+        const token = await currentUser.getIdToken();
+
+        const res = await fetch(`/api/users/${userId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        if (!res.ok) throw new Error(`Failed to fetch user: ${res.status}`);
+
+        const data = await res.json();
+        setUser({ id: userId, ...data.user } as UserData);
+
       } catch (error) {
         console.error("Error fetching user:", error);
       }
     };
+
     fetchUser();
   }, [userId]);
 

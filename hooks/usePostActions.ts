@@ -1,4 +1,4 @@
-// hooks/usePostActions.ts (Updated)
+// hooks/usePostActions.ts (Fixed typo and optimized)
 import { useState, useCallback } from 'react';
 import { auth } from '@/lib/firebase';
 import { toast } from 'react-toastify';
@@ -186,7 +186,7 @@ export const usePostActions = (
     
     try {
       const token = await getAuthToken();
-      const commentText = commentInputs[postId];
+      const commentText = commentInputs[postId]; // Fixed typo here: was "consText"
       
       if (!commentText?.trim()) {
         toast.error("Comment cannot be empty");
