@@ -56,10 +56,13 @@ export default function UserProfile() {
   const { cachedUsers, setCachedUsers } = useUserCache();
 
   // User profile hook - only pass currentUser.uid if currentUser exists
-  const { 
+  const {
     userData, 
     posts, 
     loading: profileLoading,
+    postsLoading,
+    loadingProgress,
+    error,
     setPosts, 
     isFollowing, 
     setUserData
@@ -379,21 +382,26 @@ const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
 
           {activeTab === 'posts' && (
             <div className="space-y-4 sm:space-y-6 max-w-2xl mx-auto">
-              <AnimatePresence>
-                {posts
-                  .slice()
-                  .sort((a, b) => {
-                    const aTime = a.timestamp instanceof Date
-                      ? a.timestamp.getTime()
-                      : (a.timestamp?.seconds || 0) * 1000;
-                  
-                    const bTime = b.timestamp instanceof Date
-                      ? b.timestamp.getTime()
-                      : (b.timestamp?.seconds || 0) * 1000;
-                  
-                    return bTime - aTime; // latest first
-                  })
-                  .map((post) => (
+              {postsLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : (
+                <AnimatePresence>
+                  {posts
+                    .slice()
+                    .sort((a, b) => {
+                      const aTime = a.timestamp instanceof Date
+                        ? a.timestamp.getTime()
+                        : (a.timestamp?.seconds || 0) * 1000;
+                    
+                      const bTime = b.timestamp instanceof Date
+                        ? b.timestamp.getTime()
+                        : (b.timestamp?.seconds || 0) * 1000;
+                    
+                      return bTime - aTime; // latest first
+                    })
+                    .map((post) => (
                     <motion.div
                       key={post.id}
                       initial={{ opacity: 0, y: 20 }}
@@ -495,14 +503,15 @@ const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
                       />  
                     </motion.div>
                   ))}
-                {posts.length === 0 && (
-                  <div className="text-center py-8 sm:py-12">
-                    <div className="text-4xl sm:text-6xl mb-4">📝</div>
-                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2">No posts yet</h3>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">Share your first failure story!</p>
-                  </div>
-                )}
-              </AnimatePresence>
+                  {posts.length === 0 && !postsLoading && (
+                    <div className="text-center py-8 sm:py-12">
+                      <div className="text-4xl sm:text-6xl mb-4">📝</div>
+                      <h3 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white mb-2">No posts yet</h3>
+                      <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">Share your first failure story!</p>
+                    </div>
+                  )}
+                </AnimatePresence>
+              )}
             </div>
           )}
         </div>

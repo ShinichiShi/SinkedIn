@@ -16,6 +16,9 @@ import PostContent from "@/components/post/PostContent";
 import { formatRelativeTime } from "@/utils/timeUtils";
 import Image from "next/image";
 
+// Import enhanced loading components
+import { ProfileLoadingState, PostsLoadingSkeleton, PostsInlineLoader } from "@/components/profile/ProfileLoadingState";
+
 // Import custom hooks
 import { useAuth } from "@/hooks/useAuth";
 import { useUserCache } from "@/hooks/useUserCache";
@@ -44,6 +47,9 @@ export default function UserProfile() {
     posts,
     setPosts,
     loading: profileLoading,
+    postsLoading,
+    loadingProgress = 0,
+    error = null,
     isFollowing,
     setIsFollowing,
     fetchUserData
@@ -77,12 +83,15 @@ export default function UserProfile() {
     setIsFollowing(false);
   };
 
-  // Fetch user data on component mount
+  // Fetch user data on component mount and when userId changes
   useEffect(() => {
     if (!userId) return;
     if (!authInitialized) return;
+    
+    // Reset previous state when userId changes
+    console.log("Profile page: fetching data for userId:", userId);
     fetchUserData();
-  }, [userId, currentUser, router, fetchUserData,authInitialized]);
+  }, [userId, currentUser, authInitialized, fetchUserData]);
 
   // Fetch profile pics for comments
   useEffect(() => {
@@ -109,14 +118,75 @@ export default function UserProfile() {
 
   const loading = profileLoading || authLoading;
 
+  // Enhanced loading state with progress
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <div className="text-center max-w-md mx-auto px-4">
+          {/* Main spinner */}
+          <div className="relative mb-6">
+            <div className="w-20 h-20 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mx-auto"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-blue-400 font-bold text-sm">{Math.round(loadingProgress || 0)}%</span>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div className="w-full bg-gray-700 rounded-full h-2 mb-4">
+            <div 
+              className="bg-blue-500 h-2 rounded-full transition-all duration-300 ease-out"
+              style={{ width: `${loadingProgress || 0}%` }}
+            ></div>
+          </div>
+
+          {/* Loading text */}
+          <h2 className="text-xl font-semibold text-white mb-2">Loading Profile</h2>
+          <p className="text-gray-400 text-sm">
+            {(loadingProgress || 0) < 30 && "Authenticating..."}
+            {(loadingProgress || 0) >= 30 && (loadingProgress || 0) < 50 && "Fetching user data..."}
+            {(loadingProgress || 0) >= 50 && (loadingProgress || 0) < 80 && "Loading posts..."}
+            {(loadingProgress || 0) >= 80 && "Almost ready..."}
+          </p>
+
+          {/* Timeout warning */}
+          {(loadingProgress || 0) > 0 && (
+            <div className="mt-4 text-xs text-gray-500">
+              Maximum wait time: 10 seconds
+            </div>
+          )}
+        </div>
       </div>
     );
   }
 
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="text-6xl mb-4">😕</div>
+          <h1 className="text-2xl font-bold mb-2 text-white">Something went wrong</h1>
+          <p className="text-gray-400 mb-6 text-sm">{error}</p>
+          <div className="space-y-3">
+            <button 
+              onClick={() => window.location.reload()}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg transition-colors w-full"
+            >
+              Try Again
+            </button>
+            <button 
+              onClick={() => window.history.back()}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors w-full"
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // User not found state
   if (!userData) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
@@ -323,21 +393,28 @@ export default function UserProfile() {
 
           {activeTab === 'posts' && (
             <div className="space-y-4 sm:space-y-6">
-              <AnimatePresence>
-                {posts
-                  .slice()
-                  .sort((a, b) => {
-                    const aTime = a.timestamp instanceof Date
-                      ? a.timestamp.getTime()
-                      : (a.timestamp?.seconds || 0) * 1000;
-                  
-                    const bTime = b.timestamp instanceof Date
-                      ? b.timestamp.getTime()
-                      : (b.timestamp?.seconds || 0) * 1000;
-                  
-                    return bTime - aTime; // latest first
-                  })
-                  .map((post:any) => (
+              {postsLoading ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-3"></div>
+                  <p className="text-gray-400 text-sm">Loading posts...</p>
+                  <p className="text-gray-500 text-xs mt-1">Maximum wait: 10 seconds</p>
+                </div>
+              ) : (
+                <AnimatePresence>
+                  {posts
+                    .slice()
+                    .sort((a, b) => {
+                      const aTime = a.timestamp instanceof Date
+                        ? a.timestamp.getTime()
+                        : (a.timestamp?.seconds || 0) * 1000;
+                    
+                      const bTime = b.timestamp instanceof Date
+                        ? b.timestamp.getTime()
+                        : (b.timestamp?.seconds || 0) * 1000;
+                    
+                      return bTime - aTime; // latest first
+                    })
+                    .map((post:any) => (
                     <motion.div
                       key={post.id}
                       initial={{ opacity: 0, y: 20 }}
@@ -439,14 +516,15 @@ export default function UserProfile() {
                       />  
                     </motion.div>
                   ))}
-                {posts.length === 0 && (
-                  <div className="text-center py-8 sm:py-12">
-                    <div className="text-4xl sm:text-6xl mb-4">📝</div>
-                    <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No posts yet</h3>
-                    <p className="text-gray-400 text-sm sm:text-base">{userData.username} hasn&apos;t shared any failure stories yet!</p>
-                  </div>
-                )}
-              </AnimatePresence>
+                  {posts.length === 0 && !postsLoading && (
+                    <div className="text-center py-8 sm:py-12">
+                      <div className="text-4xl sm:text-6xl mb-4">📝</div>
+                      <h3 className="text-lg sm:text-xl font-semibold text-white mb-2">No posts yet</h3>
+                      <p className="text-gray-400 text-sm sm:text-base">{userData?.username} hasn&apos;t shared any failure stories yet!</p>
+                    </div>
+                  )}
+                </AnimatePresence>
+              )}
             </div>
           )}
         </div>

@@ -30,7 +30,9 @@ export function UserListItem({ userId }: { userId: string }) {
         if (!res.ok) throw new Error(`Failed to fetch user: ${res.status}`);
 
         const data = await res.json();
-        setUser({ id: userId, ...data.user } as UserData);
+        const userData = { uid: userId, ...data.user } as UserData;
+        console.log("UserListItem: Setting user data:", userData);
+        setUser(userData);
 
       } catch (error) {
         console.error("Error fetching user:", error);
@@ -55,7 +57,7 @@ export function UserListItem({ userId }: { userId: string }) {
   }
 
   return (
-    <Link href={`/profile/${user.uid}`} className="block">
+    <Link href={`/profile/${user.uid || userId}`} className="block">
       <div className="p-4 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-white/70 dark:hover:bg-gray-800/70 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-300 shadow-sm hover:shadow-md">
         <div className="flex items-start gap-4">
           <Avatar className="w-12 h-12 border-2 border-blue-200 dark:border-blue-500/30 shadow-md flex-shrink-0">
