@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPin, UserPlus, UserMinus } from "lucide-react";
+import { MapPin, UserPlus, UserMinus, Pin } from "lucide-react";
 import Image from "next/image";
 import { getAuth, signOut } from "firebase/auth";
 import { doc,updateDoc } from "firebase/firestore";
@@ -391,6 +391,11 @@ const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
                   {posts
                     .slice()
                     .sort((a, b) => {
+                      // Hardcode specific post to always be at the top
+                      if (a.id === "4MTHuFu0m70FgRBaju2k") return -1;
+                      if (b.id === "4MTHuFu0m70FgRBaju2k") return 1;
+                      
+                      // For all other posts, sort by timestamp (newest first)
                       const aTime = a.timestamp instanceof Date
                         ? a.timestamp.getTime()
                         : (a.timestamp?.seconds || 0) * 1000;
@@ -399,7 +404,7 @@ const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
                         ? b.timestamp.getTime()
                         : (b.timestamp?.seconds || 0) * 1000;
                     
-                      return bTime - aTime; // latest first
+                      return bTime - aTime;
                     })
                     .map((post) => (
                     <motion.div
@@ -429,9 +434,14 @@ const handleArrayFieldChange = (field: keyof UserData, values: string[]) => {
                                 )}
                               </div>
                               <div>
-                                <h3 className="font-semibold text-gray-900 dark:text-white">
-                                  {post.userName}
-                                </h3>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold text-gray-900 dark:text-white">
+                                    {post.userName}
+                                  </h3>
+                                  {(post.pinned || post.id === "4MTHuFu0m70FgRBaju2k") && (
+                                    <Pin className="h-4 w-4 text-blue-500" />
+                                  )}
+                                </div>
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
                                   {formatRelativeTime(post.timestamp)}
                                 </p>

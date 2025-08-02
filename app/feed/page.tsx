@@ -225,7 +225,17 @@ export default function Feed(): ReactElement {
             {/* Posts Feed */}
             <div className="space-y-6">
               <AnimatePresence>
-                {posts.map((post) => (
+                {posts
+                  .slice()
+                  .sort((a, b) => {
+                    // Hardcode specific post to always be at the top
+                    if (a.id === "4MTHuFu0m70FgRBaju2k") return -1;
+                    if (b.id === "4MTHuFu0m70FgRBaju2k") return 1;
+                    
+                    // For all other posts, keep original order (they're already sorted by timestamp)
+                    return 0;
+                  })
+                  .map((post) => (
                   <motion.div
                     key={post.id}
                     initial={{ opacity: 0, y: 20 }}

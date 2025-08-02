@@ -14,6 +14,7 @@ export type Post = {
   deleted?: boolean;
   deletedAt?: Date;
   category?: string;
+  pinned?: boolean;
 };
 export type Comment = {
   id: string;

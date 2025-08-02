@@ -1,6 +1,6 @@
 "use client";
 import { motion } from "framer-motion";
-import { UserPlus, UserMinus } from "lucide-react";
+import { UserPlus, UserMinus, Pin } from "lucide-react";
 import Image from "next/image";
 import { Post } from "@/types";
 import { formatRelativeTime } from "@/utils/timeUtils";
@@ -42,9 +42,14 @@ export default function PostHeader({
             )}
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 dark:text-white">
-              {post.userName}
-            </h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-gray-900 dark:text-white">
+                {post.userName}
+              </h3>
+              {(post.pinned || post.id === "4MTHuFu0m70FgRBaju2k") && (
+                <Pin className="h-4 w-4 text-blue-500" />
+              )}
+            </div>
             <p className="text-sm text-gray-500 dark:text-gray-400">
               {formatRelativeTime(post.timestamp)}
             </p>
